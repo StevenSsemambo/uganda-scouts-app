@@ -1,0 +1,67 @@
+import { NavLink, useNavigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { Button } from './ui'
+
+const memberLinks = [
+  { to: '/member', label: 'My Dashboard', end: true },
+  { to: '/member/profile', label: 'My Information' },
+  { to: '/member/payments', label: 'Payments' },
+  { to: '/member/submit', label: 'Submit District Info' },
+]
+
+const adminLinks = [
+  { to: '/admin', label: 'Overview', end: true },
+  { to: '/admin/members', label: 'Members' },
+  { to: '/admin/payments', label: 'Verify Payments' },
+  { to: '/admin/modules/schools', label: 'Schools' },
+  { to: '/admin/modules/commissioners', label: 'Commissioners' },
+  { to: '/admin/modules/trainers', label: 'Trainers' },
+  { to: '/admin/modules/scout_leaders', label: 'Scout Leaders' },
+  { to: '/admin/modules/rover_scouts', label: 'Rover Scouts' },
+  { to: '/admin/modules/donors', label: 'Donors' },
+  { to: '/admin/modules/district_leadership', label: 'District Leadership' },
+  { to: '/admin/modules/district_subscriptions', label: 'District Subscriptions' },
+]
+
+export default function Layout({ children, area }) {
+  const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
+  const links = area === 'admin' ? adminLinks : memberLinks
+
+  async function handleSignOut() {
+    await signOut()
+    navigate('/')
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
+      <aside className="md:w-64 shrink-0 bg-forest text-canvas flex md:flex-col">
+        <div className="p-5 border-b border-canvas/10 hidden md:block">
+          <div className="font-display font-bold text-lg leading-tight">The USA</div>
+          <div className="text-xs opacity-70 mt-0.5">Uganda Scouts Association</div>
+        </div>
+        <nav className="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:p-3 gap-1 flex-1">
+          {links.map(link => (
+            <NavLink
+              key={link.to}
+              to={link.to}
+              end={link.end}
+              className={({ isActive }) =>
+                `px-3.5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  isActive ? 'bg-ember text-ink' : 'text-canvas/85 hover:bg-forest-dark'
+                }`
+              }
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="p-3 border-t border-canvas/10 hidden md:block">
+          <div className="text-xs opacity-70 mb-2 truncate">{profile?.name}</div>
+          <Button variant="secondary" className="w-full" onClick={handleSignOut}>Sign Out</Button>
+        </div>
+      </aside>
+      <main className="flex-1 p-4 md:p-8 max-w-6xl">{children}</main>
+    </div>
+  )
+}
