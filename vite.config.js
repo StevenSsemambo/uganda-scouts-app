@@ -14,8 +14,8 @@ export default defineConfig({
         name: 'The USA — Uganda Scouts Association',
         short_name: 'USA App',
         description: 'Membership, registration and fee tracking app for the Uganda Scouts Association',
-        theme_color: '#14532D',
-        background_color: '#FBF7EE',
+        theme_color: '#3E1A5B',
+        background_color: '#F6F3F9',
         display: 'standalone',
         start_url: '/',
         icons: [

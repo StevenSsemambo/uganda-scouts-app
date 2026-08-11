@@ -7,18 +7,21 @@
 @import "@fontsource/inter/700.css";
 
 @theme {
-  /* Canvas-and-badge palette, drawn from the scouting world */
-  --color-canvas: #F7F2E7;      /* tent-canvas cream — page background */
-  --color-canvas-2: #EFE6D2;    /* slightly deeper panel tone */
-  --color-forest: #1F4D36;      /* deep scout green — primary */
-  --color-forest-dark: #163826;
-  --color-khaki: #C9B893;       /* uniform khaki — secondary surfaces */
-  --color-khaki-dark: #A8956A;
-  --color-ember: #C98A2C;       /* badge-thread gold — accent */
-  --color-ember-light: #E7B865;
-  --color-ink: #2B2620;         /* charcoal — text */
-  --color-clay: #A6402A;        /* clay red — alerts / pending */
-  --color-clay-light: #F1DCD4;
+  /* Uganda Scouts Association palette — purple, black, red, matching the
+     organization's own branding. Token names kept from the original
+     build (forest/khaki/ember/etc.) so components didn't need edits —
+     only the hex values changed. */
+  --color-canvas: #F6F3F9;      /* soft lavender-white — page background */
+  --color-canvas-2: #ECE4F3;    /* slightly deeper panel tone */
+  --color-forest: #3E1A5B;      /* deep royal purple — primary brand color */
+  --color-forest-dark: #2A1140;
+  --color-khaki: #D9D3E2;       /* cool light neutral — secondary surfaces/borders */
+  --color-khaki-dark: #B6ACC5;
+  --color-ember: #C8102E;       /* scout red — accent */
+  --color-ember-light: #F0B8C0;
+  --color-ink: #17131B;         /* near-black — text, matches "black" brand color */
+  --color-clay: #B4530C;        /* amber — pending/warning (kept distinct from brand red) */
+  --color-clay-light: #F5E6D3;
   --color-moss: #3F7A56;        /* verified / success */
   --color-moss-light: #DCEBE1;
 

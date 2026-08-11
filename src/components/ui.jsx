@@ -5,7 +5,7 @@ export function Button({ children, variant = 'primary', className = '', ...props
     primary: 'bg-forest text-canvas hover:bg-forest-dark',
     secondary: 'bg-khaki text-ink hover:bg-khaki-dark',
     ghost: 'bg-transparent text-forest hover:bg-canvas-2 border border-forest/30',
-    danger: 'bg-clay text-canvas hover:opacity-90',
+    danger: 'bg-ember text-canvas hover:opacity-90',
   }
   return (
     <button className={`${base} ${variants[variant]} ${className}`} {...props}>
@@ -56,7 +56,7 @@ export function StatusPill({ status }) {
   const map = {
     pending: 'bg-clay-light text-clay',
     verified: 'bg-moss-light text-moss',
-    rejected: 'bg-clay-light text-clay',
+    rejected: 'bg-ember-light text-ember',
   }
   const labels = { pending: 'Pending', verified: 'Verified', rejected: 'Rejected' }
   return (
