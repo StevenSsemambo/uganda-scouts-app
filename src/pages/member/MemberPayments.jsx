@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useMember } from '../../lib/useMember'
 import { supabase } from '../../lib/supabaseClient'
@@ -11,12 +12,20 @@ const METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', '
 
 export default function MemberPayments() {
   const { member, loading: memberLoading } = useMember()
+  const location = useLocation()
+  const prefill = location.state || {}
+
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
+  // Auto-open the form (and pre-fill it) when arriving straight from
+  // registration, so the process visibly continues instead of stopping.
+  const [showForm, setShowForm] = useState(Boolean(prefill.justRegistered))
   const [form, setForm] = useState({
-    amount: '', purpose: PURPOSES[0], payment_method: METHODS[0],
-    reference_number: '', payment_date: '',
+    amount: prefill.prefillAmount ?? '',
+    purpose: prefill.prefillPurpose || PURPOSES[0],
+    payment_method: METHODS[0],
+    reference_number: '',
+    payment_date: '',
   })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -76,6 +85,16 @@ export default function MemberPayments() {
           {showForm ? 'Cancel' : '+ Report a Payment'}
         </Button>
       </div>
+
+      {prefill.justRegistered && (
+        <Card className="max-w-lg mb-4 border-ember/50 bg-ember-light/20">
+          <p className="text-sm">
+            <span className="font-semibold">Registration complete.</span> One step left — report the{' '}
+            <span className="font-semibold">{formatUGX(prefill.prefillAmount)}</span> fee below once you've
+            paid it via bank deposit or Mobile Money, so an admin can verify it.
+          </p>
+        </Card>
+      )}
 
       {showForm && (
         <Card className="max-w-lg mb-8">
