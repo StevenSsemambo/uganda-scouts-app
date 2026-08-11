@@ -1,7 +1,24 @@
-import { Link } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui'
+import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
+  const { user, profile, loading } = useAuth()
+  const navigate = useNavigate()
+
+  // If someone lands here already signed in — most commonly right after
+  // clicking the email sign-in link — send them straight to their area
+  // instead of showing the generic landing page.
+  useEffect(() => {
+    if (loading || !user) return
+    if (profile?.role === 'admin') {
+      navigate('/admin', { replace: true })
+    } else {
+      navigate('/member', { replace: true })
+    }
+  }, [user, profile, loading, navigate])
+
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 text-center">
       <div className="stitched w-24 h-24 flex items-center justify-center bg-forest text-canvas mb-6">
