@@ -16,7 +16,7 @@ export default function AdminPayments() {
     setLoading(true)
     let query = supabase
       .from('payments')
-      .select('*, members(full_name, member_code, district)')
+      .select('*, members(full_name, member_code, district, user_id)')
       .order('created_at', { ascending: false })
     if (filter !== 'all') query = query.eq('status', filter)
     const { data } = await query
@@ -26,11 +26,27 @@ export default function AdminPayments() {
 
   useEffect(() => { load() }, [filter])
 
-  async function updateStatus(id, status) {
+  async function updateStatus(payment, status) {
     await supabase
       .from('payments')
       .update({ status, verified_by: user.id, verified_at: new Date().toISOString() })
-      .eq('id', id)
+      .eq('id', payment.id)
+
+    const memberUserId = payment.members?.user_id
+    if (memberUserId) {
+      const notif = status === 'verified'
+        ? {
+            title: 'Payment Verified',
+            body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} has been verified. You can now download your receipt.`,
+            type: 'payment_verified',
+          }
+        : {
+            title: 'Payment Needs Attention',
+            body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} (ref: ${payment.reference_number}) was rejected. Please check the details and resubmit.`,
+            type: 'payment_rejected',
+          }
+      await supabase.from('notifications').insert({ user_id: memberUserId, ...notif })
+    }
     load()
   }
 
@@ -88,8 +104,8 @@ export default function AdminPayments() {
                 <StatusPill status={p.status} />
                 {p.status === 'pending' && (
                   <>
-                    <Button variant="primary" onClick={() => updateStatus(p.id, 'verified')}>Verify</Button>
-                    <Button variant="danger" onClick={() => updateStatus(p.id, 'rejected')}>Reject</Button>
+                    <Button variant="primary" onClick={() => updateStatus(p, 'verified')}>Verify</Button>
+                    <Button variant="danger" onClick={() => updateStatus(p, 'rejected')}>Reject</Button>
                   </>
                 )}
               </div>

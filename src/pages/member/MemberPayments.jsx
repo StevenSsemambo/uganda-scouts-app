@@ -138,7 +138,13 @@ export default function MemberPayments() {
               </div>
               <div className="flex items-center gap-3">
                 <StatusPill status={p.status} />
-                <Button variant="ghost" onClick={() => downloadReceipt(p)}>Download Receipt</Button>
+                {p.status === 'verified' ? (
+                  <Button variant="ghost" onClick={() => downloadReceipt(p)}>Download Receipt</Button>
+                ) : (
+                  <span className="text-xs text-ink/40 max-w-[160px] text-right">
+                    Receipt available once verified
+                  </span>
+                )}
               </div>
             </Card>
           ))}

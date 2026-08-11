@@ -1,37 +1,59 @@
 import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '../../context/AuthContext'
 import { DISTRICTS } from '../../data/districts'
+import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { Button, Card, Input, Select, EmptyState } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
 
 export default function AdminMembers() {
+  const { isAdmin, user: currentUser } = useAuth()
   const [members, setMembers] = useState([])
+  const [profilesByUserId, setProfilesByUserId] = useState({})
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [districtFilter, setDistrictFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [busyId, setBusyId] = useState(null)
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true)
-      const { data } = await supabase
-        .from('members')
-        .select('*')
-        .order('created_at', { ascending: false })
-      setMembers(data || [])
-      setLoading(false)
+  async function load() {
+    setLoading(true)
+    const { data } = await supabase
+      .from('members')
+      .select('*')
+      .order('created_at', { ascending: false })
+    const rows = data || []
+    setMembers(rows)
+
+    // Full admins can see everyone's profile — used to show whether a
+    // member is already a Category Admin, and to toggle it inline.
+    if (isAdmin) {
+      const userIds = rows.map(m => m.user_id).filter(Boolean)
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, role, managed_category')
+          .in('id', userIds)
+        const map = {}
+        for (const p of profiles || []) map[p.id] = p
+        setProfilesByUserId(map)
+      }
     }
-    load()
-  }, [])
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [isAdmin])
 
   const filtered = useMemo(() => {
     return members.filter(m => {
       const matchesSearch = !search || m.full_name.toLowerCase().includes(search.toLowerCase()) || (m.member_code || '').toLowerCase().includes(search.toLowerCase())
       const matchesDistrict = !districtFilter || m.district === districtFilter
-      return matchesSearch && matchesDistrict
+      const matchesCategory = !categoryFilter || m.category === categoryFilter
+      return matchesSearch && matchesDistrict && matchesCategory
     })
-  }, [members, search, districtFilter])
+  }, [members, search, districtFilter, categoryFilter])
 
   function exportCSV() {
     downloadCSV('members.csv', filtered.map(m => ({
@@ -44,6 +66,41 @@ export default function AdminMembers() {
       year: m.year,
       registered_on: m.created_at,
     })))
+  }
+
+  async function promote(member) {
+    if (!member.user_id) return
+    setBusyId(member.id)
+    await supabase
+      .from('profiles')
+      .update({ role: 'category_admin', managed_category: member.category })
+      .eq('id', member.user_id)
+    await supabase.from('notifications').insert({
+      user_id: member.user_id,
+      title: "You've been promoted!",
+      body: `You are now Category Admin for "${member.category}". You can view and manage members and payments in this category from your dashboard.`,
+      type: 'promotion',
+    })
+    setBusyId(null)
+    load()
+  }
+
+  async function demote(member) {
+    if (!member.user_id) return
+    if (!confirm(`Remove Category Admin access from ${member.full_name}?`)) return
+    setBusyId(member.id)
+    await supabase
+      .from('profiles')
+      .update({ role: 'member', managed_category: null })
+      .eq('id', member.user_id)
+    await supabase.from('notifications').insert({
+      user_id: member.user_id,
+      title: 'Category Admin access removed',
+      body: `Your Category Admin access for "${member.category}" has been removed.`,
+      type: 'general',
+    })
+    setBusyId(null)
+    load()
   }
 
   return (
@@ -67,6 +124,10 @@ export default function AdminMembers() {
           <option value="">All Districts</option>
           {DISTRICTS.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
         </Select>
+        <Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="max-w-xs">
+          <option value="">All Categories</option>
+          {MEMBERSHIP_CATEGORIES.map(c => <option key={c.category} value={c.category}>{c.category}</option>)}
+        </Select>
       </div>
 
       {loading ? (
@@ -80,20 +141,46 @@ export default function AdminMembers() {
               <tr className="text-left border-b border-khaki/60 bg-canvas-2">
                 <Th>Member ID</Th><Th>Name</Th><Th>Category</Th><Th>District</Th>
                 <Th>Type</Th><Th>Amount</Th><Th>Year</Th>
+                {isAdmin && <Th>Category Admin</Th>}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(m => (
-                <tr key={m.id} className="border-b border-khaki/30 last:border-0">
-                  <Td className="font-mono text-xs">{m.member_code}</Td>
-                  <Td>{m.full_name}</Td>
-                  <Td>{m.category}</Td>
-                  <Td>{m.district}</Td>
-                  <Td>{m.membership_type}</Td>
-                  <Td>{formatUGX(m.amount)}</Td>
-                  <Td>{m.year}</Td>
-                </tr>
-              ))}
+              {filtered.map(m => {
+                const p = profilesByUserId[m.user_id]
+                const isCategoryAdminForThis = p?.role === 'category_admin' && p?.managed_category === m.category
+                return (
+                  <tr key={m.id} className="border-b border-khaki/30 last:border-0">
+                    <Td className="font-mono text-xs">{m.member_code}</Td>
+                    <Td>{m.full_name}</Td>
+                    <Td>{m.category}</Td>
+                    <Td>{m.district}</Td>
+                    <Td>{m.membership_type}</Td>
+                    <Td>{formatUGX(m.amount)}</Td>
+                    <Td>{m.year}</Td>
+                    {isAdmin && (
+                      <Td>
+                        {isCategoryAdminForThis ? (
+                          <button
+                            className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
+                            disabled={busyId === m.id}
+                            onClick={() => demote(m)}
+                          >
+                            Remove Access
+                          </button>
+                        ) : (
+                          <button
+                            className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
+                            disabled={busyId === m.id || !m.user_id || m.user_id === currentUser?.id}
+                            onClick={() => promote(m)}
+                          >
+                            Make Category Admin
+                          </button>
+                        )}
+                      </Td>
+                    )}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </Card>

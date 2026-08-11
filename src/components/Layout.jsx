@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from './ui'
+import NotificationBell from './NotificationBell'
 
 const memberLinks = [
   { to: '/member', label: 'My Dashboard', end: true },
@@ -47,8 +48,9 @@ export default function Layout({ children, area }) {
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
       <aside className="md:w-64 shrink-0 bg-forest text-canvas flex flex-col">
-        {/* Mobile-only top bar — brand + a always-visible Sign Out button.
-            Without this, small screens never showed a way to log out. */}
+        {/* Mobile-only top bar — brand + notifications + a always-visible
+            Sign Out button. Without this, small screens never showed a
+            way to log out. */}
         <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-canvas/10">
           <div>
             <div className="font-display font-bold text-base leading-tight">The USA</div>
@@ -56,22 +58,28 @@ export default function Layout({ children, area }) {
               <div className="text-[10px] opacity-80 mt-0.5">Category Admin — {managedCategory}</div>
             )}
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-xs font-semibold bg-ember text-canvas px-3 py-1.5 rounded-lg shrink-0"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button
+              onClick={handleSignOut}
+              className="text-xs font-semibold bg-ember text-canvas px-3 py-1.5 rounded-lg shrink-0"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
 
-        <div className="p-5 border-b border-canvas/10 hidden md:block">
-          <div className="font-display font-bold text-lg leading-tight">The USA</div>
-          <div className="text-xs opacity-70 mt-0.5">Uganda Scouts Association</div>
-          {isCategoryAdmin && (
-            <div className="text-xs mt-2 bg-ember/20 text-ember-light rounded px-2 py-1 inline-block">
-              Category Admin — {managedCategory}
-            </div>
-          )}
+        <div className="p-5 border-b border-canvas/10 hidden md:flex md:items-start md:justify-between">
+          <div>
+            <div className="font-display font-bold text-lg leading-tight">The USA</div>
+            <div className="text-xs opacity-70 mt-0.5">Uganda Scouts Association</div>
+            {isCategoryAdmin && (
+              <div className="text-xs mt-2 bg-ember/20 text-ember-light rounded px-2 py-1 inline-block">
+                Category Admin — {managedCategory}
+              </div>
+            )}
+          </div>
+          <NotificationBell />
         </div>
 
         <nav className="flex md:flex-col overflow-x-auto md:overflow-visible p-2 md:p-3 gap-1 flex-1">
