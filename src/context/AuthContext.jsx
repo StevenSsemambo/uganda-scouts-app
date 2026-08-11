@@ -44,7 +44,13 @@ export function AuthProvider({ children }) {
     session,
     user: session?.user ?? null,
     profile,
+    // 'admin' = full admin, sees/manages everything.
+    // 'category_admin' = scoped admin, sees/manages only their assigned category (enforced by RLS).
     isAdmin: profile?.role === 'admin',
+    isCategoryAdmin: profile?.role === 'category_admin',
+    isStaff: profile?.role === 'admin' || profile?.role === 'category_admin',
+    managedCategory: profile?.managed_category || null,
+    hasPassword: Boolean(profile?.has_password),
     loading,
     signOut,
     refreshProfile: () => loadProfile(session?.user?.id),

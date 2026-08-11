@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import { useMember } from '../../lib/useMember'
 import { supabase } from '../../lib/supabaseClient'
+import { useAuth } from '../../context/AuthContext'
 import { DISTRICTS, districtCode } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select } from '../../components/ui'
@@ -9,10 +11,15 @@ import { formatUGX } from '../../lib/format'
 
 export default function MemberProfile() {
   const { member, loading, reload } = useMember()
+  const { signOut } = useAuth()
+  const navigate = useNavigate()
   const [form, setForm] = useState(null)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [confirmText, setConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
 
   useEffect(() => {
     if (member) setForm({ ...member })
@@ -60,6 +67,16 @@ export default function MemberProfile() {
     await reload()
   }
 
+  async function handleDelete() {
+    setDeleteError('')
+    setDeleting(true)
+    const { error } = await supabase.from('members').delete().eq('id', member.id)
+    setDeleting(false)
+    if (error) { setDeleteError(error.message); return }
+    await reload()
+    navigate('/')
+  }
+
   if (loading || !form) {
     return <Layout area="member"><p className="text-ink/50">Loading…</p></Layout>
   }
@@ -70,7 +87,7 @@ export default function MemberProfile() {
       <p className="text-ink/60 mb-6">
         Correct any mistakes in your details below. Your Member ID ({member.member_code}) stays the same.
       </p>
-      <Card className="max-w-lg">
+      <Card className="max-w-lg mb-8">
         <form onSubmit={handleSave}>
           <Field label="Full Name">
             <Input value={form.full_name} onChange={e => update('full_name', e.target.value)} required />
@@ -103,6 +120,26 @@ export default function MemberProfile() {
           {saved && <p className="text-moss text-sm mb-3">Saved successfully.</p>}
           <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Save Changes'}</Button>
         </form>
+      </Card>
+
+      <Card className="max-w-lg border-clay/40">
+        <h2 className="font-display font-semibold text-clay mb-2">Delete My Membership</h2>
+        <p className="text-sm text-ink/60 mb-4">
+          This permanently removes your membership record, Member ID, and any payments you've
+          reported. Your login itself is not deleted — you could register again later if needed.
+          This cannot be undone.
+        </p>
+        <Field label={`Type DELETE to confirm`}>
+          <Input value={confirmText} onChange={e => setConfirmText(e.target.value)} placeholder="DELETE" />
+        </Field>
+        {deleteError && <p className="text-clay text-sm mb-3">{deleteError}</p>}
+        <Button
+          variant="danger"
+          disabled={confirmText !== 'DELETE' || deleting}
+          onClick={handleDelete}
+        >
+          {deleting ? 'Deleting…' : 'Permanently Delete My Membership'}
+        </Button>
       </Card>
     </Layout>
   )

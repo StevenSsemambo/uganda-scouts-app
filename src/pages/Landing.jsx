@@ -12,7 +12,7 @@ export default function Landing() {
   // instead of showing the generic landing page.
   useEffect(() => {
     if (loading || !user) return
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' || profile?.role === 'category_admin') {
       navigate('/admin', { replace: true })
     } else {
       navigate('/member', { replace: true })

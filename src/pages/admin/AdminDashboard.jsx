@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { Card } from '../../components/ui'
+import { useAuth } from '../../context/AuthContext'
 import { formatUGX } from '../../lib/format'
 
 export default function AdminDashboard() {
+  const { isCategoryAdmin, managedCategory } = useAuth()
   const [stats, setStats] = useState(null)
 
   useEffect(() => {
@@ -33,7 +35,11 @@ export default function AdminDashboard() {
   return (
     <Layout area="admin">
       <h1 className="font-display font-bold text-2xl mb-1">Overview</h1>
-      <p className="text-ink/60 mb-8">Real-time totals across every district.</p>
+      <p className="text-ink/60 mb-8">
+        {isCategoryAdmin
+          ? `Real-time totals for your category — "${managedCategory}".`
+          : 'Real-time totals across every district.'}
+      </p>
 
       {!stats ? (
         <p className="text-ink/50">Loading…</p>

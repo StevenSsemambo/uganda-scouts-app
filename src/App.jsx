@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
-import { RequireMember, RequireAdmin } from './components/ProtectedRoute'
+import { RequireMember, RequireStaff, RequireAdmin } from './components/ProtectedRoute'
 
 import Landing from './pages/Landing'
 import MemberLogin from './pages/auth/MemberLogin'
@@ -15,6 +15,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminPayments from './pages/admin/AdminPayments'
 import AdminModulePage from './pages/admin/AdminModulePage'
+import AdminCategoryAdmins from './pages/admin/AdminCategoryAdmins'
 
 export default function App() {
   return (
@@ -33,11 +34,14 @@ export default function App() {
           <Route path="/member/payments" element={<RequireMember><MemberPayments /></RequireMember>} />
           <Route path="/member/submit" element={<RequireMember><SubmitInfo /></RequireMember>} />
 
-          {/* Admin area */}
-          <Route path="/admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
-          <Route path="/admin/members" element={<RequireAdmin><AdminMembers /></RequireAdmin>} />
-          <Route path="/admin/payments" element={<RequireAdmin><AdminPayments /></RequireAdmin>} />
+          {/* Shared staff area — full Admin and Category Admin (RLS scopes the data) */}
+          <Route path="/admin" element={<RequireStaff><AdminDashboard /></RequireStaff>} />
+          <Route path="/admin/members" element={<RequireStaff><AdminMembers /></RequireStaff>} />
+          <Route path="/admin/payments" element={<RequireStaff><AdminPayments /></RequireStaff>} />
+
+          {/* Full Admin only */}
           <Route path="/admin/modules/:moduleKey" element={<RequireAdmin><AdminModulePage /></RequireAdmin>} />
+          <Route path="/admin/category-admins" element={<RequireAdmin><AdminCategoryAdmins /></RequireAdmin>} />
 
           <Route path="*" element={<Landing />} />
         </Routes>

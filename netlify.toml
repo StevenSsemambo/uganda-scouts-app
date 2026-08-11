@@ -2,6 +2,8 @@
   command = "npm run build"
   publish = "dist"
 
+# Client-side routing (React Router) — send every path to index.html
+# so refreshing or directly opening a URL like /admin doesn't 404.
 [[redirects]]
   from = "/*"
   to = "/index.html"
