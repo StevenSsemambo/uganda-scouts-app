@@ -27,16 +27,25 @@ export function useNotifications() {
 
   useEffect(() => {
     if (!user) return
+    const userId = user.id
+
+    // Guard: if a channel for this user is already registered (e.g. a
+    // previous effect run's cleanup hasn't finished yet), reuse it instead
+    // of calling .on() on an already-subscribed channel, which throws
+    // "cannot add postgres_changes callbacks ... after subscribe()".
+    const existing = supabase.getChannels().find(c => c.topic === `realtime:notifications:${userId}`)
+    if (existing) return
+
     const channel = supabase
-      .channel(`notifications:${user.id}`)
+      .channel(`notifications:${userId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` },
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${userId}` },
         (payload) => setNotifications(prev => [payload.new, ...prev])
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [user])
+  }, [user?.id]) // depend on the stable id, not the whole session/user object
 
   async function markRead(id) {
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
