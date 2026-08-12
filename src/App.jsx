@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RequireMember, RequireStaff, RequireAdmin } from './components/ProtectedRoute'
 import SplashScreen from './components/SplashScreen'
+import ErrorBoundary from './components/ErrorBoundary'
 
 import Landing from './pages/Landing'
 import MemberLogin from './pages/auth/MemberLogin'
@@ -23,6 +24,13 @@ import AdminCategoryAdmins from './pages/admin/AdminCategoryAdmins'
 // instead of flashing past on a fast connection.
 const SPLASH_MIN_MS = 1100
 
+// Wraps a page element in its own error boundary — so a crash on one
+// page shows a recoverable "Try Again" screen without taking the rest
+// of the app's navigation state down with it.
+function page(element) {
+  return <ErrorBoundary>{element}</ErrorBoundary>
+}
+
 function AppShell() {
   const { loading } = useAuth()
   const [minTimeElapsed, setMinTimeElapsed] = useState(false)
@@ -39,28 +47,28 @@ function AppShell() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Landing />} />
+        <Route path="/" element={page(<Landing />)} />
 
         {/* Auth */}
-        <Route path="/member/login" element={<MemberLogin />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/member/login" element={page(<MemberLogin />)} />
+        <Route path="/admin/login" element={page(<AdminLogin />)} />
 
         {/* Member area */}
-        <Route path="/member" element={<RequireMember><MemberDashboard /></RequireMember>} />
-        <Route path="/member/profile" element={<RequireMember><MemberProfile /></RequireMember>} />
-        <Route path="/member/payments" element={<RequireMember><MemberPayments /></RequireMember>} />
-        <Route path="/member/submit" element={<RequireMember><SubmitInfo /></RequireMember>} />
+        <Route path="/member" element={page(<RequireMember><MemberDashboard /></RequireMember>)} />
+        <Route path="/member/profile" element={page(<RequireMember><MemberProfile /></RequireMember>)} />
+        <Route path="/member/payments" element={page(<RequireMember><MemberPayments /></RequireMember>)} />
+        <Route path="/member/submit" element={page(<RequireMember><SubmitInfo /></RequireMember>)} />
 
         {/* Shared staff area — full Admin and Category Admin (RLS scopes the data) */}
-        <Route path="/admin" element={<RequireStaff><AdminDashboard /></RequireStaff>} />
-        <Route path="/admin/members" element={<RequireStaff><AdminMembers /></RequireStaff>} />
-        <Route path="/admin/payments" element={<RequireStaff><AdminPayments /></RequireStaff>} />
+        <Route path="/admin" element={page(<RequireStaff><AdminDashboard /></RequireStaff>)} />
+        <Route path="/admin/members" element={page(<RequireStaff><AdminMembers /></RequireStaff>)} />
+        <Route path="/admin/payments" element={page(<RequireStaff><AdminPayments /></RequireStaff>)} />
 
         {/* Full Admin only */}
-        <Route path="/admin/modules/:moduleKey" element={<RequireAdmin><AdminModulePage /></RequireAdmin>} />
-        <Route path="/admin/category-admins" element={<RequireAdmin><AdminCategoryAdmins /></RequireAdmin>} />
+        <Route path="/admin/modules/:moduleKey" element={page(<RequireAdmin><AdminModulePage /></RequireAdmin>)} />
+        <Route path="/admin/category-admins" element={page(<RequireAdmin><AdminCategoryAdmins /></RequireAdmin>)} />
 
-        <Route path="*" element={<Landing />} />
+        <Route path="*" element={page(<Landing />)} />
       </Routes>
     </BrowserRouter>
   )
@@ -68,8 +76,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { friendlyAuthError } from '../../lib/friendlyError'
 import { Button, Card, Field, Input } from '../../components/ui'
 
 // Two ways in:
@@ -26,7 +27,7 @@ export default function MemberLogin() {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setBusy(false)
     if (error) {
-      setError("That email/password didn't match. If you haven't set a password yet, use \"Get a login link\" below instead.")
+      setError(friendlyAuthError(error))
       return
     }
     navigate('/member', { replace: true })
@@ -45,7 +46,7 @@ export default function MemberLogin() {
       },
     })
     setBusy(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(friendlyAuthError(error)); return }
     setSent(true)
   }
 

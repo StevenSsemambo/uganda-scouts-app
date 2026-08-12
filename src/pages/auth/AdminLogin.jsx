@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
+import { friendlyAuthError } from '../../lib/friendlyError'
 import { Button, Card, Field, Input } from '../../components/ui'
 
 export default function AdminLogin() {
@@ -29,7 +30,7 @@ export default function AdminLogin() {
       password,
     })
     setBusy(false)
-    if (error) { setError(error.message); return }
+    if (error) { setError(friendlyAuthError(error)); return }
 
     const { data: profile } = await supabase
       .from('profiles')
