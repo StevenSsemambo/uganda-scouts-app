@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { Button, Card, Field, Input } from '../../components/ui'
 
@@ -29,7 +29,7 @@ export default function MemberLogin() {
       setError("That email/password didn't match. If you haven't set a password yet, use \"Get a login link\" below instead.")
       return
     }
-    navigate('/member')
+    navigate('/member', { replace: true })
   }
 
   async function requestLink(e) {
@@ -52,6 +52,9 @@ export default function MemberLogin() {
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center px-6">
       <Card className="w-full max-w-sm">
+        <Link to="/" className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1 mb-4">
+          <span aria-hidden="true">←</span> Back to Home
+        </Link>
         <h1 className="font-display font-bold text-xl mb-1">Member Login</h1>
 
         {mode === 'password' && (

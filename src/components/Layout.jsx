@@ -42,7 +42,10 @@ export default function Layout({ children, area }) {
 
   async function handleSignOut() {
     await signOut()
-    navigate('/')
+    // Use replace so the now-unauthorized page doesn't linger in history —
+    // pressing Back after signing out should land on Home, not bounce
+    // back into a protected page that immediately redirects again.
+    navigate('/', { replace: true })
   }
 
   return (

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { Button, Card, Field, Input } from '../../components/ui'
 
@@ -42,12 +42,15 @@ export default function AdminLogin() {
       setError('This account is not registered as an admin.')
       return
     }
-    navigate('/admin')
+    navigate('/admin', { replace: true })
   }
 
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center px-6">
       <Card className="w-full max-w-sm">
+        <Link to="/" className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1 mb-4">
+          <span aria-hidden="true">←</span> Back to Home
+        </Link>
         <h1 className="font-display font-bold text-xl mb-1">Admin Login</h1>
         <p className="text-sm text-ink/60 mb-6">Sign in with your registered admin email and password.</p>
         <form onSubmit={handleLogin}>
