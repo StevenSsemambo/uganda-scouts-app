@@ -1,15 +1,32 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import CompleteRegistration from './CompleteRegistration'
 import { useMember } from '../../lib/useMember'
 import { useAuth } from '../../context/AuthContext'
+import { supabase } from '../../lib/supabaseClient'
 import { Card, MemberBadge, Button } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import SetPasswordCard from '../../components/SetPasswordCard'
+import BankDetailsCard from '../../components/BankDetailsCard'
 
 export default function MemberDashboard() {
   const { member, loading } = useMember()
   const { hasPassword } = useAuth()
+  const [hasVerifiedPayment, setHasVerifiedPayment] = useState(true) // default true so the banner doesn't flash before we know
+
+  useEffect(() => {
+    async function checkVerified() {
+      if (!member) return
+      const { count } = await supabase
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('member_id', member.id)
+        .eq('status', 'verified')
+      setHasVerifiedPayment((count || 0) > 0)
+    }
+    checkVerified()
+  }, [member])
 
   if (loading) {
     return <Layout area="member"><p className="text-ink/50">Loading…</p></Layout>
@@ -25,6 +42,12 @@ export default function MemberDashboard() {
       <p className="text-ink/60 mb-6">Your membership overview for {member.year}.</p>
 
       {!hasPassword && <SetPasswordCard />}
+
+      {!hasVerifiedPayment && (
+        <div className="mb-8">
+          <BankDetailsCard memberCode={member.member_code} />
+        </div>
+      )}
 
       <div className="grid md:grid-cols-[auto_1fr] gap-6 mb-8">
         <MemberBadge code={member.member_code} name={member.district} size={140} />

@@ -7,6 +7,7 @@ import { DISTRICTS, districtCode } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
+import BankDetailsCard from '../../components/BankDetailsCard'
 
 export default function CompleteRegistration() {
   const { user, profile } = useAuth()
@@ -96,6 +97,10 @@ export default function CompleteRegistration() {
             {busy ? 'Creating your record…' : 'Complete Registration & Report Payment'}
           </Button>
         </form>
+
+        <div className="mt-6">
+          <BankDetailsCard />
+        </div>
       </Card>
     </div>
   )

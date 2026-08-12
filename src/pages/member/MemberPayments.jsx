@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { Button, Card, Field, Input, Select, StatusPill, EmptyState } from '../../components/ui'
 import { formatUGX, formatDate } from '../../lib/format'
 import { generateReceiptPDF } from '../../lib/receipt'
+import BankDetailsCard from '../../components/BankDetailsCard'
 
 const PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
 const METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', 'Cash to District Office', 'Other']
@@ -95,6 +96,10 @@ export default function MemberPayments() {
           </p>
         </Card>
       )}
+
+      <div className="max-w-lg mb-8">
+        <BankDetailsCard memberCode={member.member_code} />
+      </div>
 
       {showForm && (
         <Card className="max-w-lg mb-8">
