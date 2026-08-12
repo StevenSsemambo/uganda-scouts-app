@@ -8,6 +8,7 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Landing from './pages/Landing'
 import MemberLogin from './pages/auth/MemberLogin'
 import AdminLogin from './pages/auth/AdminLogin'
+import ResetPassword from './pages/auth/ResetPassword'
 
 import MemberDashboard from './pages/member/MemberDashboard'
 import MemberProfile from './pages/member/MemberProfile'
@@ -19,6 +20,7 @@ import AdminMembers from './pages/admin/AdminMembers'
 import AdminPayments from './pages/admin/AdminPayments'
 import AdminModulePage from './pages/admin/AdminModulePage'
 import AdminCategoryAdmins from './pages/admin/AdminCategoryAdmins'
+import SendMessage from './pages/admin/SendMessage'
 
 // Minimum time the splash stays up, so the brand actually registers
 // instead of flashing past on a fast connection.
@@ -52,6 +54,7 @@ function AppShell() {
         {/* Auth */}
         <Route path="/member/login" element={page(<MemberLogin />)} />
         <Route path="/admin/login" element={page(<AdminLogin />)} />
+        <Route path="/reset-password" element={page(<ResetPassword />)} />
 
         {/* Member area */}
         <Route path="/member" element={page(<RequireMember><MemberDashboard /></RequireMember>)} />
@@ -63,6 +66,7 @@ function AppShell() {
         <Route path="/admin" element={page(<RequireStaff><AdminDashboard /></RequireStaff>)} />
         <Route path="/admin/members" element={page(<RequireStaff><AdminMembers /></RequireStaff>)} />
         <Route path="/admin/payments" element={page(<RequireStaff><AdminPayments /></RequireStaff>)} />
+        <Route path="/admin/send-message" element={page(<RequireStaff><SendMessage /></RequireStaff>)} />
 
         {/* Full Admin only */}
         <Route path="/admin/modules/:moduleKey" element={page(<RequireAdmin><AdminModulePage /></RequireAdmin>)} />

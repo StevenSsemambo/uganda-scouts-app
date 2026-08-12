@@ -16,6 +16,7 @@ const staffLinks = [
   { to: '/admin', label: 'Overview', end: true },
   { to: '/admin/members', label: 'Members' },
   { to: '/admin/payments', label: 'Verify Payments' },
+  { to: '/admin/send-message', label: 'Send Message' },
 ]
 
 // Full Admin only — association-wide, not category-scoped.

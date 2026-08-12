@@ -4,15 +4,18 @@ import { supabase } from '../../lib/supabaseClient'
 import { friendlyAuthError } from '../../lib/friendlyError'
 import { Button, Card, Field, Input } from '../../components/ui'
 
-// Two ways in:
+// Three ways in:
 // - "Login" (default): normal email + password, for anyone who has
 //   already set a password from their dashboard after their first visit.
 // - "Get a login link": the original passwordless flow, for first-time
 //   signups or anyone who hasn't set a password yet.
+// - "Forgot password": emails a reset link for anyone who has a
+//   password but can't remember it.
 export default function MemberLogin() {
   const navigate = useNavigate()
-  const [mode, setMode] = useState('password') // 'password' | 'link'
+  const [mode, setMode] = useState('password') // 'password' | 'link' | 'forgot'
   const [sent, setSent] = useState(false)
+  const [resetSent, setResetSent] = useState(false)
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -50,6 +53,18 @@ export default function MemberLogin() {
     setSent(true)
   }
 
+  async function requestPasswordReset(e) {
+    e.preventDefault()
+    setError('')
+    setBusy(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setBusy(false)
+    if (error) { setError(friendlyAuthError(error)); return }
+    setResetSent(true)
+  }
+
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center px-6">
       <Card className="w-full max-w-sm">
@@ -73,13 +88,22 @@ export default function MemberLogin() {
                 {busy ? 'Signing in…' : 'Login'}
               </Button>
             </form>
-            <button
-              type="button"
-              className="text-sm text-forest underline mt-4 block mx-auto"
-              onClick={() => { setMode('link'); setError('') }}
-            >
-              New here, or haven't set a password? Get a login link
-            </button>
+            <div className="flex flex-col items-center gap-2 mt-4">
+              <button
+                type="button"
+                className="text-sm text-forest underline"
+                onClick={() => { setMode('link'); setError('') }}
+              >
+                New here, or haven't set a password? Get a login link
+              </button>
+              <button
+                type="button"
+                className="text-sm text-ink/50 underline"
+                onClick={() => { setMode('forgot'); setError(''); setResetSent(false) }}
+              >
+                Forgot your password?
+              </button>
+            </div>
           </>
         )}
 
@@ -122,6 +146,42 @@ export default function MemberLogin() {
             </p>
             <Button variant="ghost" className="w-full" onClick={() => setSent(false)}>
               Use a different email
+            </Button>
+          </div>
+        )}
+
+        {mode === 'forgot' && !resetSent && (
+          <>
+            <p className="text-sm text-ink/60 mb-6">
+              Enter your email and we'll send you a link to set a new password.
+            </p>
+            <form onSubmit={requestPasswordReset}>
+              <Field label="Email">
+                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" />
+              </Field>
+              {error && <p className="text-clay text-sm mb-3">{error}</p>}
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? 'Sending…' : 'Send Reset Link'}
+              </Button>
+            </form>
+            <button
+              type="button"
+              className="text-sm text-forest underline mt-4 block mx-auto"
+              onClick={() => { setMode('password'); setError('') }}
+            >
+              Back to Login
+            </button>
+          </>
+        )}
+
+        {mode === 'forgot' && resetSent && (
+          <div>
+            <p className="text-sm text-ink/70 mb-4">
+              We've sent a password reset link to <span className="font-medium">{email}</span>.
+              Open it on this device to set a new password.
+            </p>
+            <Button variant="ghost" className="w-full" onClick={() => { setMode('password'); setResetSent(false) }}>
+              Back to Login
             </Button>
           </div>
         )}

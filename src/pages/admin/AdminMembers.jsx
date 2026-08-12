@@ -17,6 +17,7 @@ export default function AdminMembers() {
   const [districtFilter, setDistrictFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
+  const [toast, setToast] = useState('')
 
   async function load() {
     setLoading(true)
@@ -28,13 +29,14 @@ export default function AdminMembers() {
     setMembers(rows)
 
     // Full admins can see everyone's profile — used to show whether a
-    // member is already a Category Admin, and to toggle it inline.
+    // member is already a Category Admin, get their email for password
+    // resets/reports, and to toggle roles inline.
     if (isAdmin) {
       const userIds = rows.map(m => m.user_id).filter(Boolean)
       if (userIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, role, managed_category')
+          .select('id, email, role, managed_category')
           .in('id', userIds)
         const map = {}
         for (const p of profiles || []) map[p.id] = p
@@ -46,6 +48,12 @@ export default function AdminMembers() {
 
   useEffect(() => { load() }, [isAdmin])
 
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(() => setToast(''), 4000)
+    return () => clearTimeout(t)
+  }, [toast])
+
   const filtered = useMemo(() => {
     return members.filter(m => {
       const matchesSearch = !search || m.full_name.toLowerCase().includes(search.toLowerCase()) || (m.member_code || '').toLowerCase().includes(search.toLowerCase())
@@ -56,16 +64,21 @@ export default function AdminMembers() {
   }, [members, search, districtFilter, categoryFilter])
 
   function exportCSV() {
-    downloadCSV('members.csv', filtered.map(m => ({
-      member_id: m.member_code,
-      name: m.full_name,
-      category: m.category,
-      district: m.district,
-      membership_type: m.membership_type,
-      amount: m.amount,
-      year: m.year,
-      registered_on: m.created_at,
-    })))
+    downloadCSV('members-report.csv', filtered.map(m => {
+      const p = profilesByUserId[m.user_id]
+      return {
+        member_id: m.member_code,
+        name: m.full_name,
+        email: p?.email || '',
+        category: m.category,
+        district: m.district,
+        membership_type: m.membership_type,
+        amount: m.amount,
+        year: m.year,
+        account_role: p?.role || '',
+        registered_on: m.created_at,
+      }
+    }))
   }
 
   async function promote(member) {
@@ -103,6 +116,43 @@ export default function AdminMembers() {
     load()
   }
 
+  async function sendPasswordReset(member) {
+    const p = profilesByUserId[member.user_id]
+    if (!p?.email) return
+    setBusyId(member.id)
+    const { error } = await supabase.auth.resetPasswordForEmail(p.email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    setBusyId(null)
+    setToast(error
+      ? `Couldn't send reset email: ${error.message}`
+      : `Password reset link sent to ${p.email}.`)
+  }
+
+  async function deleteAccount(member) {
+    if (!member.user_id) return
+    const confirmed = confirm(
+      `Permanently delete ${member.full_name}'s account?\n\n` +
+      `This removes their membership record, payment history, and login access. This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setBusyId(member.id)
+    const { data: { session } } = await supabase.auth.getSession()
+    const { data, error } = await supabase.functions.invoke('delete-user', {
+      body: { userId: member.user_id },
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    setBusyId(null)
+
+    if (error || data?.error) {
+      setToast(`Couldn't delete account: ${data?.error || error.message}`)
+      return
+    }
+    setToast(`${member.full_name}'s account has been deleted.`)
+    load()
+  }
+
   return (
     <Layout area="admin">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -110,8 +160,14 @@ export default function AdminMembers() {
           <h1 className="font-display font-bold text-2xl mb-1">Members</h1>
           <p className="text-ink/60">{filtered.length} of {members.length} members shown.</p>
         </div>
-        <Button onClick={exportCSV}>Download CSV</Button>
+        <Button onClick={exportCSV}>Download Full Report</Button>
       </div>
+
+      {toast && (
+        <Card className="max-w-lg mb-4 bg-canvas-2">
+          <p className="text-sm">{toast}</p>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-3 mb-6">
         <Input
@@ -141,13 +197,14 @@ export default function AdminMembers() {
               <tr className="text-left border-b border-khaki/60 bg-canvas-2">
                 <Th>Member ID</Th><Th>Name</Th><Th>Category</Th><Th>District</Th>
                 <Th>Type</Th><Th>Amount</Th><Th>Year</Th>
-                {isAdmin && <Th>Category Admin</Th>}
+                {isAdmin && <Th>Actions</Th>}
               </tr>
             </thead>
             <tbody>
               {filtered.map(m => {
                 const p = profilesByUserId[m.user_id]
                 const isCategoryAdminForThis = p?.role === 'category_admin' && p?.managed_category === m.category
+                const isSelf = m.user_id === currentUser?.id
                 return (
                   <tr key={m.id} className="border-b border-khaki/30 last:border-0">
                     <Td className="font-mono text-xs">{m.member_code}</Td>
@@ -159,23 +216,39 @@ export default function AdminMembers() {
                     <Td>{m.year}</Td>
                     {isAdmin && (
                       <Td>
-                        {isCategoryAdminForThis ? (
-                          <button
-                            className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
-                            disabled={busyId === m.id}
-                            onClick={() => demote(m)}
-                          >
-                            Remove Access
-                          </button>
-                        ) : (
+                        <div className="flex flex-wrap gap-3">
+                          {isCategoryAdminForThis ? (
+                            <button
+                              className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
+                              disabled={busyId === m.id}
+                              onClick={() => demote(m)}
+                            >
+                              Remove Access
+                            </button>
+                          ) : (
+                            <button
+                              className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
+                              disabled={busyId === m.id || !m.user_id || isSelf}
+                              onClick={() => promote(m)}
+                            >
+                              Make Category Admin
+                            </button>
+                          )}
                           <button
                             className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
-                            disabled={busyId === m.id || !m.user_id || m.user_id === currentUser?.id}
-                            onClick={() => promote(m)}
+                            disabled={busyId === m.id || !p?.email}
+                            onClick={() => sendPasswordReset(m)}
                           >
-                            Make Category Admin
+                            Reset Password
                           </button>
-                        )}
+                          <button
+                            className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
+                            disabled={busyId === m.id || !m.user_id || isSelf}
+                            onClick={() => deleteAccount(m)}
+                          >
+                            Delete Account
+                          </button>
+                        </div>
                       </Td>
                     )}
                   </tr>
