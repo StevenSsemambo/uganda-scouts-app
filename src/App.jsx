@@ -20,6 +20,7 @@ import AdminMembers from './pages/admin/AdminMembers'
 import AdminPayments from './pages/admin/AdminPayments'
 import AdminModulePage from './pages/admin/AdminModulePage'
 import AdminCategoryAdmins from './pages/admin/AdminCategoryAdmins'
+import AdminBankDetails from './pages/admin/AdminBankDetails'
 import SendMessage from './pages/admin/SendMessage'
 
 // Minimum time the splash stays up, so the brand actually registers
@@ -71,6 +72,7 @@ function AppShell() {
         {/* Full Admin only */}
         <Route path="/admin/modules/:moduleKey" element={page(<RequireAdmin><AdminModulePage /></RequireAdmin>)} />
         <Route path="/admin/category-admins" element={page(<RequireAdmin><AdminCategoryAdmins /></RequireAdmin>)} />
+        <Route path="/admin/bank-details" element={page(<RequireAdmin><AdminBankDetails /></RequireAdmin>)} />
 
         <Route path="*" element={page(<Landing />)} />
       </Routes>

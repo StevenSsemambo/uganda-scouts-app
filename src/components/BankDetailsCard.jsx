@@ -1,22 +1,29 @@
 import { useState } from 'react'
-import { BANK_DETAILS } from '../data/bankDetails'
+import { useBankDetails } from '../lib/useBankDetails'
 
 // The one place bank deposit details are designed — large, high-contrast,
 // copyable account number, and a clear reference instruction. Rendered
 // wherever a member needs to know where to send money (registration,
-// payments page, dashboard reminder).
+// payments page, dashboard reminder). Details are loaded live from the
+// database, so an admin updating them anywhere reflects here instantly.
 export default function BankDetailsCard({ memberCode, compact = false }) {
+  const { details, loading } = useBankDetails()
   const [copied, setCopied] = useState(false)
 
   async function copyAccountNumber() {
+    if (!details?.account_number) return
     try {
-      await navigator.clipboard.writeText(BANK_DETAILS.accountNumber)
+      await navigator.clipboard.writeText(details.account_number)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // Clipboard API can fail on some older mobile browsers — the number
       // is still fully visible and selectable by hand as a fallback.
     }
+  }
+
+  if (loading || !details || !details.account_number) {
+    return null
   }
 
   return (
@@ -33,12 +40,24 @@ export default function BankDetailsCard({ memberCode, compact = false }) {
       <div className="grid sm:grid-cols-2 gap-4 mb-4">
         <div>
           <div className="text-xs text-canvas/60 mb-1">Bank</div>
-          <div className="font-medium">{BANK_DETAILS.bankName}</div>
+          <div className="font-medium">{details.bank_name}</div>
         </div>
-        {BANK_DETAILS.accountName && (
+        {details.account_name && (
           <div>
             <div className="text-xs text-canvas/60 mb-1">Account Name</div>
-            <div className="font-medium">{BANK_DETAILS.accountName}</div>
+            <div className="font-medium">{details.account_name}</div>
+          </div>
+        )}
+        {details.branch && (
+          <div>
+            <div className="text-xs text-canvas/60 mb-1">Branch</div>
+            <div className="font-medium">{details.branch}</div>
+          </div>
+        )}
+        {details.swift_code && (
+          <div>
+            <div className="text-xs text-canvas/60 mb-1">SWIFT Code</div>
+            <div className="font-medium">{details.swift_code}</div>
           </div>
         )}
       </div>
@@ -47,7 +66,7 @@ export default function BankDetailsCard({ memberCode, compact = false }) {
         <div className="text-xs text-canvas/60 mb-1.5">Account Number</div>
         <div className="flex items-center gap-3 flex-wrap">
           <span className="font-mono font-bold text-2xl md:text-3xl tracking-wider bg-canvas/10 px-4 py-2 rounded-lg select-all">
-            {BANK_DETAILS.accountNumber}
+            {details.account_number}
           </span>
           <button
             type="button"

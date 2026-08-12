@@ -30,6 +30,7 @@ const fullAdminLinks = [
   { to: '/admin/modules/district_leadership', label: 'District Leadership' },
   { to: '/admin/modules/district_subscriptions', label: 'District Subscriptions' },
   { to: '/admin/category-admins', label: 'Category Admins' },
+  { to: '/admin/bank-details', label: 'Bank Details' },
 ]
 
 export default function Layout({ children, area }) {
