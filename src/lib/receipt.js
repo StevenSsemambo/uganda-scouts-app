@@ -10,9 +10,9 @@ export function generateReceiptPDF({ member, payment }) {
   const marginX = 56
 
   // Header band
-  doc.setFillColor(31, 77, 54) // forest green
+  doc.setFillColor(62, 26, 91) // forest purple (brand primary)
   doc.rect(0, 0, pageWidth, 90, 'F')
-  doc.setTextColor(247, 242, 231) // canvas cream
+  doc.setTextColor(246, 243, 249) // canvas
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
   doc.text('Uganda Scouts Association', marginX, 40)
@@ -21,13 +21,13 @@ export function generateReceiptPDF({ member, payment }) {
   doc.text('Official Payment Receipt', marginX, 60)
 
   let y = 130
-  doc.setTextColor(43, 38, 32) // ink
+  doc.setTextColor(23, 19, 27) // ink
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(13)
   doc.text('Payment Confirmation', marginX, y)
   y += 10
-  doc.setDrawColor(201, 138, 44) // ember gold
+  doc.setDrawColor(200, 16, 46) // ember red (brand accent)
   doc.setLineWidth(1.2)
   doc.line(marginX, y, pageWidth - marginX, y)
   y += 28
@@ -57,13 +57,13 @@ export function generateReceiptPDF({ member, payment }) {
   })
 
   y += 10
-  doc.setDrawColor(201, 138, 44)
+  doc.setDrawColor(200, 16, 46)
   doc.line(marginX, y, pageWidth - marginX, y)
   y += 24
 
   doc.setFont('helvetica', 'italic')
   doc.setFontSize(9.5)
-  doc.setTextColor(90, 82, 70)
+  doc.setTextColor(90, 82, 95)
   const note = payment?.status === 'verified'
     ? 'This receipt confirms a payment that has been verified by an Association admin against the official bank/mobile money statement.'
     : 'This payment has not yet been verified by an Association admin. This document is not proof of a completed transaction until verified.'
