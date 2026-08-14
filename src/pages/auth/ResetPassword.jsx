@@ -25,15 +25,21 @@ export default function ResetPassword() {
     if (password !== confirm) { setError("Passwords don't match."); return }
 
     setBusy(true)
-    const { error: pwError } = await supabase.auth.updateUser({ password })
-    if (pwError) { setBusy(false); setError(friendlyAuthError(pwError)); return }
+    try {
+      const { error: pwError } = await supabase.auth.updateUser({ password })
+      if (pwError) throw pwError
 
-    if (user) {
-      await supabase.from('profiles').update({ has_password: true }).eq('id', user.id)
-      await refreshProfile()
+      if (user) {
+        await supabase.from('profiles').update({ has_password: true }).eq('id', user.id)
+        await refreshProfile()
+      }
+      setDone(true)
+    } catch (err) {
+      console.error('Failed to set new password:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
-    setDone(true)
   }
 
   return (

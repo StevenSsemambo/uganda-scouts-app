@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select } from '../../components/ui'
+import { friendlyError } from '../../lib/friendlyError'
 
 // Shared by full Admin (any category, or any individual) and Category
 // Admin (their own category only, or an individual within it — row-
@@ -29,14 +30,20 @@ export default function SendMessage() {
       return
     }
     const t = setTimeout(async () => {
-      // RLS already scopes this: a Category Admin's query only ever
-      // returns members within their own category.
-      const { data } = await supabase
-        .from('members')
-        .select('id, user_id, full_name, member_code, category')
-        .ilike('full_name', `%${memberQuery}%`)
-        .limit(8)
-      setMemberResults(data || [])
+      try {
+        // RLS already scopes this: a Category Admin's query only ever
+        // returns members within their own category.
+        const { data, error } = await supabase
+          .from('members')
+          .select('id, user_id, full_name, member_code, category')
+          .ilike('full_name', `%${memberQuery}%`)
+          .limit(8)
+        if (error) throw error
+        setMemberResults(data || [])
+      } catch (err) {
+        console.error('Member search failed:', err)
+        setMemberResults([])
+      }
     }, 300)
     return () => clearTimeout(t)
   }, [memberQuery, targetType])
@@ -72,7 +79,6 @@ export default function SendMessage() {
         const userIds = [...new Set((recipients || []).map(m => m.user_id).filter(Boolean))]
         if (userIds.length === 0) {
           setError(`No members found in "${category}" yet.`)
-          setBusy(false)
           return
         }
         const rows = userIds.map(user_id => ({ user_id, title, body, type: 'announcement' }))
@@ -85,9 +91,11 @@ export default function SendMessage() {
       setSelectedMember(null)
       setMemberQuery('')
     } catch (err) {
-      setError(err.message)
+      console.error('Failed to send message:', err)
+      setError(friendlyError(err, "Couldn't send this message."))
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
   }
 
   return (

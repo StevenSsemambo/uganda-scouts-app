@@ -27,42 +27,57 @@ export default function MemberLogin() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    setBusy(false)
-    if (error) {
-      setError(friendlyAuthError(error))
-      return
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      navigate('/member', { replace: true })
+    } catch (err) {
+      console.error('Login failed:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
     }
-    navigate('/member', { replace: true })
   }
 
   async function requestLink(e) {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: true,
-        data: { name, role: 'member' },
-        emailRedirectTo: `${window.location.origin}/`,
-      },
-    })
-    setBusy(false)
-    if (error) { setError(friendlyAuthError(error)); return }
-    setSent(true)
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: true,
+          data: { name, role: 'member' },
+          emailRedirectTo: `${window.location.origin}/`,
+        },
+      })
+      if (error) throw error
+      setSent(true)
+    } catch (err) {
+      console.error('Failed to send login link:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function requestPasswordReset(e) {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    setBusy(false)
-    if (error) { setError(friendlyAuthError(error)); return }
-    setResetSent(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err) {
+      console.error('Failed to send password reset:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

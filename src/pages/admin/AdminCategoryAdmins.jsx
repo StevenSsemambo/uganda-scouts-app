@@ -3,6 +3,7 @@ import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select, EmptyState } from '../../components/ui'
+import { friendlyError } from '../../lib/friendlyError'
 
 // Full-admin-only page for promoting an existing registered account
 // (member or otherwise) into a Category Admin scoped to one membership
@@ -10,21 +11,32 @@ import { Button, Card, Field, Input, Select, EmptyState } from '../../components
 export default function AdminCategoryAdmins() {
   const [categoryAdmins, setCategoryAdmins] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [email, setEmail] = useState('')
   const [category, setCategory] = useState(MEMBERSHIP_CATEGORIES[0].category)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
+  const [demoteBusyId, setDemoteBusyId] = useState(null)
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('role', 'category_admin')
-      .order('managed_category')
-    setCategoryAdmins(data || [])
-    setLoading(false)
+    setLoadError('')
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'category_admin')
+        .order('managed_category')
+      if (error) throw error
+      setCategoryAdmins(data || [])
+    } catch (err) {
+      console.error('Failed to load Category Admins:', err)
+      setLoadError(friendlyError(err, 'Could not load Category Admins.'))
+      setCategoryAdmins([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [])
@@ -34,35 +46,51 @@ export default function AdminCategoryAdmins() {
     setError('')
     setStatus('')
     setBusy(true)
+    try {
+      const { data: found, error: findError } = await supabase
+        .from('profiles')
+        .select('id, name, email, role')
+        .eq('email', email.trim())
+        .maybeSingle()
+      if (findError) throw findError
+      if (!found) {
+        setError('No registered account found with that email. They need to sign up as a member first (via the normal member login), then you can promote them here.')
+        return
+      }
 
-    const { data: found, error: findError } = await supabase
-      .from('profiles')
-      .select('id, name, email, role')
-      .eq('email', email.trim())
-      .maybeSingle()
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ role: 'category_admin', managed_category: category })
+        .eq('id', found.id)
+      if (updateError) throw updateError
 
-    if (findError || !found) {
+      setStatus(`${found.name} (${found.email}) is now Category Admin for "${category}".`)
+      setEmail('')
+      await load()
+    } catch (err) {
+      console.error('Failed to promote account:', err)
+      setError(friendlyError(err, "Couldn't complete that action."))
+    } finally {
       setBusy(false)
-      setError('No registered account found with that email. They need to sign up as a member first (via the normal member login), then you can promote them here.')
-      return
     }
-
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ role: 'category_admin', managed_category: category })
-      .eq('id', found.id)
-
-    setBusy(false)
-    if (updateError) { setError(updateError.message); return }
-    setStatus(`${found.name} (${found.email}) is now Category Admin for "${category}".`)
-    setEmail('')
-    load()
   }
 
   async function demote(id) {
     if (!confirm('Remove Category Admin access for this account? They will become a regular member again.')) return
-    await supabase.from('profiles').update({ role: 'member', managed_category: null }).eq('id', id)
-    load()
+    setDemoteBusyId(id)
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'member', managed_category: null })
+        .eq('id', id)
+      if (error) throw error
+      await load()
+    } catch (err) {
+      console.error('Failed to remove Category Admin access:', err)
+      setError(friendlyError(err, "Couldn't remove access."))
+    } finally {
+      setDemoteBusyId(null)
+    }
   }
 
   return (
@@ -93,6 +121,11 @@ export default function AdminCategoryAdmins() {
       <h2 className="font-display font-semibold text-lg mb-3">Current Category Admins</h2>
       {loading ? (
         <p className="text-ink/50">Loading…</p>
+      ) : loadError ? (
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError}</p>
+          <Button variant="ghost" onClick={load}>Try Again</Button>
+        </Card>
       ) : categoryAdmins.length === 0 ? (
         <EmptyState title="No Category Admins yet" hint="Promote someone using the form above." />
       ) : (
@@ -103,7 +136,9 @@ export default function AdminCategoryAdmins() {
                 <div className="font-medium">{p.name}</div>
                 <div className="text-sm text-ink/50">{p.email} · manages "{p.managed_category}"</div>
               </div>
-              <Button variant="danger" onClick={() => demote(p.id)}>Remove Access</Button>
+              <Button variant="danger" disabled={demoteBusyId === p.id} onClick={() => demote(p.id)}>
+                {demoteBusyId === p.id ? 'Removing…' : 'Remove Access'}
+              </Button>
             </Card>
           ))}
         </div>

@@ -7,17 +7,19 @@ import { Button, Card, Field, Input, Select, StatusPill, EmptyState } from '../.
 import { formatUGX, formatDate } from '../../lib/format'
 import { generateReceiptPDF } from '../../lib/receipt'
 import BankDetailsCard from '../../components/BankDetailsCard'
+import { friendlyError } from '../../lib/friendlyError'
 
 const PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
 const METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', 'Cash to District Office', 'Other']
 
 export default function MemberPayments() {
-  const { member, loading: memberLoading } = useMember()
+  const { member, loading: memberLoading, error: memberError, reload: reloadMember } = useMember()
   const location = useLocation()
   const prefill = location.state || {}
 
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   // Auto-open the form (and pre-fill it) when arriving straight from
   // registration, so the process visibly continues instead of stopping.
   const [showForm, setShowForm] = useState(Boolean(prefill.justRegistered))
@@ -34,13 +36,22 @@ export default function MemberPayments() {
   async function loadPayments() {
     if (!member) return
     setLoading(true)
-    const { data } = await supabase
-      .from('payments')
-      .select('*')
-      .eq('member_id', member.id)
-      .order('created_at', { ascending: false })
-    setPayments(data || [])
-    setLoading(false)
+    setLoadError('')
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('member_id', member.id)
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setPayments(data || [])
+    } catch (err) {
+      console.error('Failed to load payments:', err)
+      setLoadError(friendlyError(err, 'Could not load your payments.'))
+      setPayments([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { loadPayments() }, [member])
@@ -51,28 +62,50 @@ export default function MemberPayments() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.from('payments').insert({
-      member_id: member.id,
-      amount: Number(form.amount),
-      purpose: form.purpose,
-      payment_method: form.payment_method,
-      reference_number: form.reference_number,
-      payment_date: form.payment_date,
-      year: new Date(form.payment_date).getFullYear() || new Date().getFullYear(),
-    })
-    setBusy(false)
-    if (error) { setError(error.message); return }
-    setForm({ amount: '', purpose: PURPOSES[0], payment_method: METHODS[0], reference_number: '', payment_date: '' })
-    setShowForm(false)
-    loadPayments()
+    try {
+      const { error } = await supabase.from('payments').insert({
+        member_id: member.id,
+        amount: Number(form.amount),
+        purpose: form.purpose,
+        payment_method: form.payment_method,
+        reference_number: form.reference_number,
+        payment_date: form.payment_date,
+        year: new Date(form.payment_date).getFullYear() || new Date().getFullYear(),
+      })
+      if (error) throw error
+      setForm({ amount: '', purpose: PURPOSES[0], payment_method: METHODS[0], reference_number: '', payment_date: '' })
+      setShowForm(false)
+      await loadPayments()
+    } catch (err) {
+      console.error('Failed to submit payment:', err)
+      setError(friendlyError(err, "Couldn't submit this payment."))
+    } finally {
+      setBusy(false)
+    }
   }
 
   function downloadReceipt(payment) {
-    generateReceiptPDF({ member, payment })
+    try {
+      generateReceiptPDF({ member, payment })
+    } catch (err) {
+      console.error('Failed to generate receipt:', err)
+      setError("Couldn't generate the receipt. Please try again.")
+    }
   }
 
   if (memberLoading || loading) {
     return <Layout area="member"><p className="text-ink/50">Loading…</p></Layout>
+  }
+
+  if (memberError || !member) {
+    return (
+      <Layout area="member">
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{memberError || 'Could not load your membership.'}</p>
+          <Button variant="ghost" onClick={reloadMember}>Try Again</Button>
+        </Card>
+      </Layout>
+    )
   }
 
   return (
@@ -130,7 +163,14 @@ export default function MemberPayments() {
       )}
 
       {payments.length === 0 ? (
-        <EmptyState title="No payments reported yet" hint="Use the button above once you've made a payment." />
+        loadError ? (
+          <Card className="max-w-lg border-clay/50">
+            <p className="text-sm text-clay mb-3">{loadError}</p>
+            <Button variant="ghost" onClick={loadPayments}>Try Again</Button>
+          </Card>
+        ) : (
+          <EmptyState title="No payments reported yet" hint="Use the button above once you've made a payment." />
+        )
       ) : (
         <div className="space-y-3">
           {payments.map(p => (

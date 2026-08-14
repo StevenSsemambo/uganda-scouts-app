@@ -6,30 +6,53 @@ import { MODULES } from '../../data/modules'
 import { Button, Card, EmptyState } from '../../components/ui'
 import { downloadCSV } from '../../lib/csv'
 import { formatUGX } from '../../lib/format'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminModulePage() {
   const { moduleKey } = useParams()
   const mod = MODULES[moduleKey]
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [busyId, setBusyId] = useState(null)
+  const [actionError, setActionError] = useState('')
 
   async function load() {
     if (!mod) return
     setLoading(true)
-    const { data } = await supabase
-      .from(mod.table)
-      .select('*')
-      .order('created_at', { ascending: false })
-    setRows(data || [])
-    setLoading(false)
+    setLoadError('')
+    try {
+      const { data, error } = await supabase
+        .from(mod.table)
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      setRows(data || [])
+    } catch (err) {
+      console.error(`Failed to load ${mod.table}:`, err)
+      setLoadError(friendlyError(err, 'Could not load these records.'))
+      setRows([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [moduleKey])
 
   async function handleDelete(id) {
     if (!confirm('Remove this record?')) return
-    await supabase.from(mod.table).delete().eq('id', id)
-    load()
+    setBusyId(id)
+    setActionError('')
+    try {
+      const { error } = await supabase.from(mod.table).delete().eq('id', id)
+      if (error) throw error
+      await load()
+    } catch (err) {
+      console.error('Failed to delete record:', err)
+      setActionError(friendlyError(err, "Couldn't remove this record."))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   function exportCSV() {
@@ -52,8 +75,19 @@ export default function AdminModulePage() {
         <Button onClick={exportCSV}>Download CSV</Button>
       </div>
 
+      {actionError && (
+        <Card className="max-w-lg mb-4 border-clay/50">
+          <p className="text-sm text-clay">{actionError}</p>
+        </Card>
+      )}
+
       {loading ? (
         <p className="text-ink/50">Loading…</p>
+      ) : loadError ? (
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError}</p>
+          <Button variant="ghost" onClick={load}>Try Again</Button>
+        </Card>
       ) : rows.length === 0 ? (
         <EmptyState title={`No ${mod.label.toLowerCase()} yet`} hint="Records members submit will appear here." />
       ) : (
@@ -76,8 +110,12 @@ export default function AdminModulePage() {
                   ))}
                   <td className="px-4 py-3">{row.year}</td>
                   <td className="px-4 py-3 text-right">
-                    <button className="text-clay text-xs font-medium hover:underline" onClick={() => handleDelete(row.id)}>
-                      Remove
+                    <button
+                      className="text-clay text-xs font-medium hover:underline disabled:opacity-50"
+                      disabled={busyId === row.id}
+                      onClick={() => handleDelete(row.id)}
+                    >
+                      {busyId === row.id ? 'Removing…' : 'Remove'}
                     </button>
                   </td>
                 </tr>

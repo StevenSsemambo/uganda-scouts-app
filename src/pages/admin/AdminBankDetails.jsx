@@ -5,10 +5,11 @@ import { useAuth } from '../../context/AuthContext'
 import { useBankDetails } from '../../lib/useBankDetails'
 import { Button, Card, Field, Input } from '../../components/ui'
 import BankDetailsCard from '../../components/BankDetailsCard'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminBankDetails() {
   const { user } = useAuth()
-  const { details, loading, reload } = useBankDetails()
+  const { details, loading, error: loadError, reload } = useBankDetails()
   const [form, setForm] = useState(null)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
@@ -27,26 +28,43 @@ export default function AdminBankDetails() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase
-      .from('bank_details')
-      .update({
-        bank_name: form.bank_name,
-        account_name: form.account_name,
-        account_number: form.account_number,
-        branch: form.branch,
-        swift_code: form.swift_code,
-        updated_by: user.id,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', 1)
-    setBusy(false)
-    if (error) { setError(error.message); return }
-    setSaved(true)
-    await reload()
+    try {
+      const { error } = await supabase
+        .from('bank_details')
+        .update({
+          bank_name: form.bank_name,
+          account_name: form.account_name,
+          account_number: form.account_number,
+          branch: form.branch,
+          swift_code: form.swift_code,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', 1)
+      if (error) throw error
+      setSaved(true)
+      await reload()
+    } catch (err) {
+      console.error('Failed to save bank details:', err)
+      setError(friendlyError(err, "Couldn't save changes."))
+    } finally {
+      setBusy(false)
+    }
   }
 
-  if (loading || !form) {
+  if (loading) {
     return <Layout area="admin"><p className="text-ink/50">Loading…</p></Layout>
+  }
+
+  if (loadError || !form) {
+    return (
+      <Layout area="admin">
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError || 'Could not load bank details.'}</p>
+          <Button variant="ghost" onClick={reload}>Try Again</Button>
+        </Card>
+      </Layout>
+    )
   }
 
   return (

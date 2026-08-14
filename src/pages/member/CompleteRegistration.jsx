@@ -8,6 +8,7 @@ import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategor
 import { Button, Card, Field, Input, Select } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import BankDetailsCard from '../../components/BankDetailsCard'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function CompleteRegistration() {
   const { user, profile } = useAuth()
@@ -31,29 +32,35 @@ export default function CompleteRegistration() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const year = new Date().getFullYear()
-    const { data, error } = await supabase.from('members').insert({
-      user_id: user.id,
-      full_name: form.full_name,
-      category: form.category,
-      membership_type: selectedFee.membership_type,
-      district: form.district,
-      district_code: districtCode(form.district),
-      amount: selectedFee.amount,
-      year,
-    }).select().single()
-    setBusy(false)
-    if (error) { setError(error.message); return }
-    await reload()
-    // Send them straight into reporting the payment for the fee they just
-    // registered under — registration alone doesn't complete the process.
-    navigate('/member/payments', {
-      state: {
-        prefillAmount: selectedFee.amount,
-        prefillPurpose: selectedFee.membership_type === 'Life' ? 'Life Membership Fee' : 'Registration Fee',
-        justRegistered: true,
-      },
-    })
+    try {
+      const year = new Date().getFullYear()
+      const { error } = await supabase.from('members').insert({
+        user_id: user.id,
+        full_name: form.full_name,
+        category: form.category,
+        membership_type: selectedFee.membership_type,
+        district: form.district,
+        district_code: districtCode(form.district),
+        amount: selectedFee.amount,
+        year,
+      }).select().single()
+      if (error) throw error
+      await reload()
+      // Send them straight into reporting the payment for the fee they just
+      // registered under — registration alone doesn't complete the process.
+      navigate('/member/payments', {
+        state: {
+          prefillAmount: selectedFee.amount,
+          prefillPurpose: selectedFee.membership_type === 'Life' ? 'Life Membership Fee' : 'Registration Fee',
+          justRegistered: true,
+        },
+      })
+    } catch (err) {
+      console.error('Failed to complete registration:', err)
+      setError(friendlyError(err, "Couldn't complete your registration."))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

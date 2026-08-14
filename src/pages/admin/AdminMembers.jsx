@@ -7,12 +7,14 @@ import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { Button, Card, Input, Select, EmptyState } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminMembers() {
   const { isAdmin, user: currentUser } = useAuth()
   const [members, setMembers] = useState([])
   const [profilesByUserId, setProfilesByUserId] = useState({})
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [search, setSearch] = useState('')
   const [districtFilter, setDistrictFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
@@ -21,29 +23,39 @@ export default function AdminMembers() {
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('members')
-      .select('*')
-      .order('created_at', { ascending: false })
-    const rows = data || []
-    setMembers(rows)
+    setLoadError('')
+    try {
+      const { data, error } = await supabase
+        .from('members')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      const rows = data || []
+      setMembers(rows)
 
-    // Full admins can see everyone's profile — used to show whether a
-    // member is already a Category Admin, get their email for password
-    // resets/reports, and to toggle roles inline.
-    if (isAdmin) {
-      const userIds = rows.map(m => m.user_id).filter(Boolean)
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('id, email, role, managed_category')
-          .in('id', userIds)
-        const map = {}
-        for (const p of profiles || []) map[p.id] = p
-        setProfilesByUserId(map)
+      // Full admins can see everyone's profile — used to show whether a
+      // member is already a Category Admin, get their email for password
+      // resets/reports, and to toggle roles inline.
+      if (isAdmin) {
+        const userIds = rows.map(m => m.user_id).filter(Boolean)
+        if (userIds.length > 0) {
+          const { data: profiles, error: profilesError } = await supabase
+            .from('profiles')
+            .select('id, email, role, managed_category')
+            .in('id', userIds)
+          if (profilesError) throw profilesError
+          const map = {}
+          for (const p of profiles || []) map[p.id] = p
+          setProfilesByUserId(map)
+        }
       }
+    } catch (err) {
+      console.error('Failed to load members:', err)
+      setLoadError(friendlyError(err, 'Could not load members.'))
+      setMembers([])
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   useEffect(() => { load() }, [isAdmin])
@@ -84,49 +96,68 @@ export default function AdminMembers() {
   async function promote(member) {
     if (!member.user_id) return
     setBusyId(member.id)
-    await supabase
-      .from('profiles')
-      .update({ role: 'category_admin', managed_category: member.category })
-      .eq('id', member.user_id)
-    await supabase.from('notifications').insert({
-      user_id: member.user_id,
-      title: "You've been promoted!",
-      body: `You are now Category Admin for "${member.category}". You can view and manage members and payments in this category from your dashboard.`,
-      type: 'promotion',
-    })
-    setBusyId(null)
-    load()
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'category_admin', managed_category: member.category })
+        .eq('id', member.user_id)
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: member.user_id,
+        title: "You've been promoted!",
+        body: `You are now Category Admin for "${member.category}". You can view and manage members and payments in this category from your dashboard.`,
+        type: 'promotion',
+      })
+      await load()
+    } catch (err) {
+      console.error('Failed to promote member:', err)
+      setToast(friendlyError(err, "Couldn't promote this member."))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   async function demote(member) {
     if (!member.user_id) return
     if (!confirm(`Remove Category Admin access from ${member.full_name}?`)) return
     setBusyId(member.id)
-    await supabase
-      .from('profiles')
-      .update({ role: 'member', managed_category: null })
-      .eq('id', member.user_id)
-    await supabase.from('notifications').insert({
-      user_id: member.user_id,
-      title: 'Category Admin access removed',
-      body: `Your Category Admin access for "${member.category}" has been removed.`,
-      type: 'general',
-    })
-    setBusyId(null)
-    load()
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: 'member', managed_category: null })
+        .eq('id', member.user_id)
+      if (error) throw error
+      await supabase.from('notifications').insert({
+        user_id: member.user_id,
+        title: 'Category Admin access removed',
+        body: `Your Category Admin access for "${member.category}" has been removed.`,
+        type: 'general',
+      })
+      await load()
+    } catch (err) {
+      console.error('Failed to demote member:', err)
+      setToast(friendlyError(err, "Couldn't remove access."))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   async function sendPasswordReset(member) {
     const p = profilesByUserId[member.user_id]
     if (!p?.email) return
     setBusyId(member.id)
-    const { error } = await supabase.auth.resetPasswordForEmail(p.email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    setBusyId(null)
-    setToast(error
-      ? `Couldn't send reset email: ${error.message}`
-      : `Password reset link sent to ${p.email}.`)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(p.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw error
+      setToast(`Password reset link sent to ${p.email}.`)
+    } catch (err) {
+      console.error('Failed to send password reset:', err)
+      setToast(friendlyError(err, "Couldn't send reset email."))
+    } finally {
+      setBusyId(null)
+    }
   }
 
   async function deleteAccount(member) {
@@ -138,19 +169,24 @@ export default function AdminMembers() {
     if (!confirmed) return
 
     setBusyId(member.id)
-    const { data: { session } } = await supabase.auth.getSession()
-    const { data, error } = await supabase.functions.invoke('delete-user', {
-      body: { userId: member.user_id },
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-    setBusyId(null)
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !sessionData?.session) throw sessionError || new Error('No active session')
 
-    if (error || data?.error) {
-      setToast(`Couldn't delete account: ${data?.error || error.message}`)
-      return
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: member.user_id },
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
+      })
+      if (error || data?.error) throw new Error(data?.error || error.message)
+
+      setToast(`${member.full_name}'s account has been deleted.`)
+      await load()
+    } catch (err) {
+      console.error('Failed to delete account:', err)
+      setToast(friendlyError(err, "Couldn't delete this account."))
+    } finally {
+      setBusyId(null)
     }
-    setToast(`${member.full_name}'s account has been deleted.`)
-    load()
   }
 
   return (
@@ -188,6 +224,11 @@ export default function AdminMembers() {
 
       {loading ? (
         <p className="text-ink/50">Loading…</p>
+      ) : loadError ? (
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError}</p>
+          <Button variant="ghost" onClick={load}>Try Again</Button>
+        </Card>
       ) : filtered.length === 0 ? (
         <EmptyState title="No members found" hint="Try a different search or filter." />
       ) : (

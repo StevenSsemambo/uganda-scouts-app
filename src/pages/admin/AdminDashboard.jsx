@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { Button, Card } from '../../components/ui'
@@ -7,22 +7,34 @@ import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { DISTRICTS } from '../../data/districts'
 import { formatUGX } from '../../lib/format'
 import { generateSummaryReportPDF } from '../../lib/summaryReport'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminDashboard() {
   const { isAdmin, isCategoryAdmin, managedCategory, profile } = useAuth()
   const [stats, setStats] = useState(null)
   const [byCategory, setByCategory] = useState(null)
   const [byDistrict, setByDistrict] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const [pdfError, setPdfError] = useState('')
 
-  useEffect(() => {
-    async function load() {
-      const [{ count: memberCount }, { data: members }, { data: pendingPayments }, { data: verifiedPayments }] =
-        await Promise.all([
-          supabase.from('members').select('*', { count: 'exact', head: true }),
-          supabase.from('members').select('district, category'),
-          supabase.from('payments').select('id').eq('status', 'pending'),
-          supabase.from('payments').select('amount').eq('status', 'verified'),
-        ])
+  const load = useCallback(async () => {
+    setLoadError('')
+    try {
+      const [
+        { count: memberCount, error: countError },
+        { data: members, error: membersError },
+        { data: pendingPayments, error: pendingError },
+        { data: verifiedPayments, error: verifiedError },
+      ] = await Promise.all([
+        supabase.from('members').select('*', { count: 'exact', head: true }),
+        supabase.from('members').select('district, category'),
+        supabase.from('payments').select('id').eq('status', 'pending'),
+        supabase.from('payments').select('amount').eq('status', 'verified'),
+      ])
+      if (countError) throw countError
+      if (membersError) throw membersError
+      if (pendingError) throw pendingError
+      if (verifiedError) throw verifiedError
 
       const districtSet = new Set((members || []).map(m => m.district))
       const totalVerified = (verifiedPayments || []).reduce((sum, p) => sum + Number(p.amount), 0)
@@ -37,10 +49,11 @@ export default function AdminDashboard() {
       // Full-admin-only breakdowns: members and verified totals per
       // category and per district — also feeds the printable PDF summary.
       if (isAdmin) {
-        const { data: verifiedWithBoth } = await supabase
+        const { data: verifiedWithBoth, error: joinError } = await supabase
           .from('payments')
           .select('amount, members(category, district)')
           .eq('status', 'verified')
+        if (joinError) throw joinError
 
         const catCounts = {}
         const distCounts = {}
@@ -78,18 +91,28 @@ export default function AdminDashboard() {
             .sort((a, b) => b.count - a.count)
         )
       }
+    } catch (err) {
+      console.error('Failed to load dashboard stats:', err)
+      setLoadError(friendlyError(err, 'Could not load the overview.'))
     }
-    load()
   }, [isAdmin])
+
+  useEffect(() => { load() }, [load])
 
   function downloadPDF() {
     if (!stats || !byCategory || !byDistrict) return
-    generateSummaryReportPDF({
-      stats,
-      byCategory,
-      byDistrict,
-      generatedByName: profile?.name,
-    })
+    setPdfError('')
+    try {
+      generateSummaryReportPDF({
+        stats,
+        byCategory,
+        byDistrict,
+        generatedByName: profile?.name,
+      })
+    } catch (err) {
+      console.error('Failed to generate PDF summary:', err)
+      setPdfError("Couldn't generate the PDF. Please try again.")
+    }
   }
 
   return (
@@ -108,7 +131,18 @@ export default function AdminDashboard() {
           : 'Real-time totals across every district.'}
       </p>
 
-      {!stats ? (
+      {pdfError && (
+        <Card className="max-w-lg mb-6 border-clay/50">
+          <p className="text-sm text-clay">{pdfError}</p>
+        </Card>
+      )}
+
+      {loadError ? (
+        <Card className="max-w-lg mb-8 border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError}</p>
+          <Button variant="ghost" onClick={load}>Try Again</Button>
+        </Card>
+      ) : !stats ? (
         <p className="text-ink/50">Loading…</p>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">

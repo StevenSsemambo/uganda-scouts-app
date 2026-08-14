@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import { Button, Card, Field, Input } from './ui'
+import { friendlyError } from '../lib/friendlyError'
 
 // Shown to a signed-in member who hasn't set a password yet. Since they're
 // already authenticated (via the emailed link), we can attach a password
@@ -23,18 +24,24 @@ export default function SetPasswordCard() {
     if (password !== confirm) { setError("Passwords don't match."); return }
 
     setBusy(true)
-    const { error: pwError } = await supabase.auth.updateUser({ password })
-    if (pwError) { setBusy(false); setError(pwError.message); return }
+    try {
+      const { error: pwError } = await supabase.auth.updateUser({ password })
+      if (pwError) throw pwError
 
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .update({ has_password: true })
-      .eq('id', user.id)
-    setBusy(false)
-    if (profileError) { setError(profileError.message); return }
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ has_password: true })
+        .eq('id', user.id)
+      if (profileError) throw profileError
 
-    setDone(true)
-    refreshProfile()
+      setDone(true)
+      await refreshProfile()
+    } catch (err) {
+      console.error('Failed to set password:', err)
+      setError(friendlyError(err, "Couldn't set your password."))
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (done) return null

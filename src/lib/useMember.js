@@ -9,20 +9,30 @@ export function useMember() {
   const { user } = useAuth()
   const [member, setMember] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const reload = useCallback(async () => {
     if (!user) { setMember(null); setLoading(false); return }
     setLoading(true)
-    const { data } = await supabase
-      .from('members')
-      .select('*')
-      .eq('user_id', user.id)
-      .maybeSingle()
-    setMember(data || null)
-    setLoading(false)
+    setError('')
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('members')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (fetchError) throw fetchError
+      setMember(data || null)
+    } catch (err) {
+      console.error('Failed to load member record:', err)
+      setError('Could not load your membership record. Please try refreshing the page.')
+      setMember(null)
+    } finally {
+      setLoading(false)
+    }
   }, [user])
 
   useEffect(() => { reload() }, [reload])
 
-  return { member, loading, reload }
+  return { member, loading, error, reload }
 }

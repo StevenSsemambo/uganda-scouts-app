@@ -8,19 +8,29 @@ import { supabase } from './supabaseClient'
 export function useBankDetails() {
   const [details, setDetails] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const reload = useCallback(async () => {
     setLoading(true)
-    const { data } = await supabase
-      .from('bank_details')
-      .select('*')
-      .eq('id', 1)
-      .single()
-    setDetails(data || null)
-    setLoading(false)
+    setError('')
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('bank_details')
+        .select('*')
+        .eq('id', 1)
+        .maybeSingle()
+      if (fetchError) throw fetchError
+      setDetails(data || null)
+    } catch (err) {
+      console.error('Failed to load bank details:', err)
+      setError('Could not load payment details right now.')
+      setDetails(null)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { reload() }, [reload])
 
-  return { details, loading, reload }
+  return { details, loading, error, reload }
 }

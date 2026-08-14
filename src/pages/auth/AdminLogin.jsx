@@ -16,36 +16,42 @@ export default function AdminLogin() {
   async function handleLogin(e) {
     e.preventDefault()
     setError('')
-    setBusy(true)
     // Admins sign in with their registered email + password. We accept
     // "Name" as the field label per the spec, but resolve the admin's
     // stored email from their profile name for convenience if an email
     // wasn't typed directly.
     const identifier = name.includes('@') ? name : null
     if (!identifier) {
-      setBusy(false)
       setError('Please sign in using the admin email address registered by the Association.')
       return
     }
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: identifier,
-      password,
-    })
-    setBusy(false)
-    if (error) { setError(friendlyAuthError(error)); return }
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: identifier,
+        password,
+      })
+      if (error) throw error
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
-      .single()
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle()
+      if (profileError) throw profileError
 
-    if (profile?.role !== 'admin' && profile?.role !== 'category_admin') {
-      await supabase.auth.signOut()
-      setError('This account is not registered as an admin.')
-      return
+      if (profile?.role !== 'admin' && profile?.role !== 'category_admin') {
+        await supabase.auth.signOut()
+        setError('This account is not registered as an admin.')
+        return
+      }
+      navigate('/admin', { replace: true })
+    } catch (err) {
+      console.error('Admin login failed:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
     }
-    navigate('/admin', { replace: true })
   }
 
   async function handleForgotPassword(e) {
@@ -56,12 +62,18 @@ export default function AdminLogin() {
       return
     }
     setBusy(true)
-    const { error } = await supabase.auth.resetPasswordForEmail(name, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-    setBusy(false)
-    if (error) { setError(friendlyAuthError(error)); return }
-    setResetSent(true)
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(name, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw error
+      setResetSent(true)
+    } catch (err) {
+      console.error('Failed to send password reset:', err)
+      setError(friendlyAuthError(err))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

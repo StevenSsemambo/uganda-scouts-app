@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { MODULES, MODULE_KEYS } from '../../data/modules'
 import { DISTRICTS } from '../../data/districts'
 import { Button, Card, Field, Input, Select } from '../../components/ui'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function SubmitInfo() {
   const { user } = useAuth()
@@ -31,14 +32,20 @@ export default function SubmitInfo() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase.from(mod.table).insert({
-      ...form,
-      submitted_by: user.id,
-    })
-    setBusy(false)
-    if (error) { setError(error.message); return }
-    setForm({})
-    setOk(true)
+    try {
+      const { error } = await supabase.from(mod.table).insert({
+        ...form,
+        submitted_by: user.id,
+      })
+      if (error) throw error
+      setForm({})
+      setOk(true)
+    } catch (err) {
+      console.error('Failed to submit record:', err)
+      setError(friendlyError(err, "Couldn't submit this — please try again."))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (

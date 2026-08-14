@@ -5,49 +5,72 @@ import { useAuth } from '../../context/AuthContext'
 import { Button, Card, StatusPill, EmptyState, Select } from '../../components/ui'
 import { formatUGX, formatDate } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminPayments() {
   const { user } = useAuth()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState('pending')
+  const [busyId, setBusyId] = useState(null)
+  const [actionError, setActionError] = useState('')
 
   async function load() {
     setLoading(true)
-    let query = supabase
-      .from('payments')
-      .select('*, members(full_name, member_code, district, user_id)')
-      .order('created_at', { ascending: false })
-    if (filter !== 'all') query = query.eq('status', filter)
-    const { data } = await query
-    setPayments(data || [])
-    setLoading(false)
+    setLoadError('')
+    try {
+      let query = supabase
+        .from('payments')
+        .select('*, members(full_name, member_code, district, user_id)')
+        .order('created_at', { ascending: false })
+      if (filter !== 'all') query = query.eq('status', filter)
+      const { data, error } = await query
+      if (error) throw error
+      setPayments(data || [])
+    } catch (err) {
+      console.error('Failed to load payments:', err)
+      setLoadError(friendlyError(err, 'Could not load payments.'))
+      setPayments([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => { load() }, [filter])
 
   async function updateStatus(payment, status) {
-    await supabase
-      .from('payments')
-      .update({ status, verified_by: user.id, verified_at: new Date().toISOString() })
-      .eq('id', payment.id)
+    setBusyId(payment.id)
+    setActionError('')
+    try {
+      const { error } = await supabase
+        .from('payments')
+        .update({ status, verified_by: user.id, verified_at: new Date().toISOString() })
+        .eq('id', payment.id)
+      if (error) throw error
 
-    const memberUserId = payment.members?.user_id
-    if (memberUserId) {
-      const notif = status === 'verified'
-        ? {
-            title: 'Payment Verified',
-            body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} has been verified. You can now download your receipt.`,
-            type: 'payment_verified',
-          }
-        : {
-            title: 'Payment Needs Attention',
-            body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} (ref: ${payment.reference_number}) was rejected. Please check the details and resubmit.`,
-            type: 'payment_rejected',
-          }
-      await supabase.from('notifications').insert({ user_id: memberUserId, ...notif })
+      const memberUserId = payment.members?.user_id
+      if (memberUserId) {
+        const notif = status === 'verified'
+          ? {
+              title: 'Payment Verified',
+              body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} has been verified. You can now download your receipt.`,
+              type: 'payment_verified',
+            }
+          : {
+              title: 'Payment Needs Attention',
+              body: `Your ${payment.purpose} payment of ${formatUGX(payment.amount)} (ref: ${payment.reference_number}) was rejected. Please check the details and resubmit.`,
+              type: 'payment_rejected',
+            }
+        await supabase.from('notifications').insert({ user_id: memberUserId, ...notif })
+      }
+      await load()
+    } catch (err) {
+      console.error('Failed to update payment status:', err)
+      setActionError(friendlyError(err, "Couldn't update this payment."))
+    } finally {
+      setBusyId(null)
     }
-    load()
   }
 
   function exportCSV() {
@@ -83,8 +106,19 @@ export default function AdminPayments() {
         </div>
       </div>
 
+      {actionError && (
+        <Card className="max-w-lg mb-4 border-clay/50">
+          <p className="text-sm text-clay">{actionError}</p>
+        </Card>
+      )}
+
       {loading ? (
         <p className="text-ink/50">Loading…</p>
+      ) : loadError ? (
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError}</p>
+          <Button variant="ghost" onClick={load}>Try Again</Button>
+        </Card>
       ) : payments.length === 0 ? (
         <EmptyState title="Nothing here" hint="No payments match this filter." />
       ) : (
@@ -104,8 +138,12 @@ export default function AdminPayments() {
                 <StatusPill status={p.status} />
                 {p.status === 'pending' && (
                   <>
-                    <Button variant="primary" onClick={() => updateStatus(p, 'verified')}>Verify</Button>
-                    <Button variant="danger" onClick={() => updateStatus(p, 'rejected')}>Reject</Button>
+                    <Button variant="primary" disabled={busyId === p.id} onClick={() => updateStatus(p, 'verified')}>
+                      {busyId === p.id ? 'Working…' : 'Verify'}
+                    </Button>
+                    <Button variant="danger" disabled={busyId === p.id} onClick={() => updateStatus(p, 'rejected')}>
+                      Reject
+                    </Button>
                   </>
                 )}
               </div>

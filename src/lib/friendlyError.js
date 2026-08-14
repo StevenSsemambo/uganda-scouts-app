@@ -32,3 +32,26 @@ export function friendlyAuthError(error) {
   // useful information for cases we haven't specifically handled.
   return error.message || 'Something went wrong. Please try again.'
 }
+
+// General-purpose version for data mutations (saves, deletes, sends)
+// outside the auth flows above — covers permission/network/db errors
+// that any admin or member action could hit.
+export function friendlyError(error, fallback = 'Something went wrong. Please try again.') {
+  if (!error) return ''
+  const msg = (error.message || '').toLowerCase()
+
+  if (msg.includes('network') || msg.includes('fetch failed') || msg.includes('failed to fetch')) {
+    return 'Having trouble reaching the server — check your internet connection and try again.'
+  }
+  if (msg.includes('permission denied') || msg.includes('row-level security') || msg.includes('rls')) {
+    return "You don't have permission to do that."
+  }
+  if (msg.includes('duplicate key') || msg.includes('already exists')) {
+    return 'That already exists — no changes were made.'
+  }
+  if (msg.includes('jwt') || msg.includes('expired') || msg.includes('invalid token')) {
+    return 'Your session has expired — please sign in again.'
+  }
+
+  return error.message || fallback
+}

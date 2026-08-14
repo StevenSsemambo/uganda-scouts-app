@@ -3,6 +3,7 @@ import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, Field, Input } from '../../components/ui'
+import { friendlyError } from '../../lib/friendlyError'
 
 // Lets any signed-in staff member (full Admin or Category Admin) change
 // their own password. Since they're already authenticated, Supabase
@@ -24,17 +25,23 @@ export default function AdminAccount() {
     if (password !== confirm) { setError("Passwords don't match."); return }
 
     setBusy(true)
-    const { error: pwError } = await supabase.auth.updateUser({ password })
-    if (pwError) { setBusy(false); setError(pwError.message); return }
+    try {
+      const { error: pwError } = await supabase.auth.updateUser({ password })
+      if (pwError) throw pwError
 
-    if (user) {
-      await supabase.from('profiles').update({ has_password: true }).eq('id', user.id)
-      await refreshProfile()
+      if (user) {
+        await supabase.from('profiles').update({ has_password: true }).eq('id', user.id)
+        await refreshProfile()
+      }
+      setStatus('Password updated successfully.')
+      setPassword('')
+      setConfirm('')
+    } catch (err) {
+      console.error('Failed to update password:', err)
+      setError(friendlyError(err, "Couldn't update your password."))
+    } finally {
+      setBusy(false)
     }
-    setBusy(false)
-    setStatus('Password updated successfully.')
-    setPassword('')
-    setConfirm('')
   }
 
   return (

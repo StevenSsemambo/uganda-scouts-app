@@ -11,19 +11,27 @@ import SetPasswordCard from '../../components/SetPasswordCard'
 import BankDetailsCard from '../../components/BankDetailsCard'
 
 export default function MemberDashboard() {
-  const { member, loading } = useMember()
+  const { member, loading, error: memberError, reload } = useMember()
   const { hasPassword } = useAuth()
   const [hasVerifiedPayment, setHasVerifiedPayment] = useState(true) // default true so the banner doesn't flash before we know
 
   useEffect(() => {
     async function checkVerified() {
       if (!member) return
-      const { count } = await supabase
-        .from('payments')
-        .select('id', { count: 'exact', head: true })
-        .eq('member_id', member.id)
-        .eq('status', 'verified')
-      setHasVerifiedPayment((count || 0) > 0)
+      try {
+        const { count, error } = await supabase
+          .from('payments')
+          .select('id', { count: 'exact', head: true })
+          .eq('member_id', member.id)
+          .eq('status', 'verified')
+        if (error) throw error
+        setHasVerifiedPayment((count || 0) > 0)
+      } catch (err) {
+        console.error('Failed to check verified payments:', err)
+        // Fail safe: keep showing the bank details reminder rather than
+        // silently hiding it based on an unknown state.
+        setHasVerifiedPayment(false)
+      }
     }
     checkVerified()
   }, [member])
@@ -32,13 +40,29 @@ export default function MemberDashboard() {
     return <Layout area="member"><p className="text-ink/50">Loading…</p></Layout>
   }
 
+  // Only show the registration form when we've confirmed there's genuinely
+  // no member record — not when the fetch itself failed, which would
+  // otherwise wrongly tell an already-registered member to register again.
+  if (memberError) {
+    return (
+      <Layout area="member">
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{memberError}</p>
+          <Button variant="ghost" onClick={reload}>Try Again</Button>
+        </Card>
+      </Layout>
+    )
+  }
+
   if (!member) {
     return <CompleteRegistration />
   }
 
   return (
     <Layout area="member">
-      <h1 className="font-display font-bold text-2xl mb-1">Welcome, {member.full_name.split(' ')[0]}</h1>
+      <h1 className="font-display font-bold text-2xl mb-1">
+        Welcome{member.full_name ? `, ${member.full_name.split(' ')[0]}` : ''}
+      </h1>
       <p className="text-ink/60 mb-6">Your membership overview for {member.year}.</p>
 
       {!hasPassword && <SetPasswordCard />}

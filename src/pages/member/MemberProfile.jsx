@@ -8,9 +8,10 @@ import { DISTRICTS, districtCode } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
+import { friendlyError } from '../../lib/friendlyError'
 
 export default function MemberProfile() {
-  const { member, loading, reload } = useMember()
+  const { member, loading, error: loadError, reload } = useMember()
   const { signOut } = useAuth()
   const navigate = useNavigate()
   const [form, setForm] = useState(null)
@@ -50,35 +51,58 @@ export default function MemberProfile() {
     e.preventDefault()
     setError('')
     setBusy(true)
-    const { error } = await supabase
-      .from('members')
-      .update({
-        full_name: form.full_name,
-        category: form.category,
-        membership_type: form.membership_type,
-        district: form.district,
-        district_code: districtCode(form.district),
-        amount: form.amount,
-      })
-      .eq('id', member.id)
-    setBusy(false)
-    if (error) { setError(error.message); return }
-    setSaved(true)
-    await reload()
+    try {
+      const { error } = await supabase
+        .from('members')
+        .update({
+          full_name: form.full_name,
+          category: form.category,
+          membership_type: form.membership_type,
+          district: form.district,
+          district_code: districtCode(form.district),
+          amount: form.amount,
+        })
+        .eq('id', member.id)
+      if (error) throw error
+      setSaved(true)
+      await reload()
+    } catch (err) {
+      console.error('Failed to save profile:', err)
+      setError(friendlyError(err, "Couldn't save your changes."))
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleDelete() {
     setDeleteError('')
     setDeleting(true)
-    const { error } = await supabase.from('members').delete().eq('id', member.id)
-    setDeleting(false)
-    if (error) { setDeleteError(error.message); return }
-    await reload()
-    navigate('/')
+    try {
+      const { error } = await supabase.from('members').delete().eq('id', member.id)
+      if (error) throw error
+      await reload()
+      navigate('/')
+    } catch (err) {
+      console.error('Failed to delete membership:', err)
+      setDeleteError(friendlyError(err, "Couldn't delete your membership."))
+    } finally {
+      setDeleting(false)
+    }
   }
 
-  if (loading || !form) {
+  if (loading) {
     return <Layout area="member"><p className="text-ink/50">Loading…</p></Layout>
+  }
+
+  if (loadError || !form) {
+    return (
+      <Layout area="member">
+        <Card className="max-w-lg border-clay/50">
+          <p className="text-sm text-clay mb-3">{loadError || 'Could not load your information.'}</p>
+          <Button variant="ghost" onClick={reload}>Try Again</Button>
+        </Card>
+      </Layout>
+    )
   }
 
   return (
