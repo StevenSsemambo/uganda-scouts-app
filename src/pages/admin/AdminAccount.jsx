@@ -48,7 +48,7 @@ export default function AdminAccount() {
     <Layout area="admin">
       <h1 className="font-display font-bold text-2xl mb-1">My Account</h1>
       <p className="text-ink/60 mb-6">
-        {profile?.name} · {profile?.email}
+        {profile?.name} · @{profile?.username}
         {isAdmin && ' · Full Admin'}
         {isCategoryAdmin && ` · Category Admin (${managedCategory})`}
       </p>

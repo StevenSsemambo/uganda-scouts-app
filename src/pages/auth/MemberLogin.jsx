@@ -2,33 +2,37 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { friendlyAuthError } from '../../lib/friendlyError'
+import { isValidUsername, usernameToEmail } from '../../lib/username'
 import { Button, Card, Field, Input } from '../../components/ui'
 
-// Three ways in:
-// - "Login" (default): normal email + password, for anyone who has
-//   already set a password from their dashboard after their first visit.
-// - "Get a login link": the original passwordless flow, for first-time
-//   signups or anyone who hasn't set a password yet.
-// - "Forgot password": emails a reset link for anyone who has a
-//   password but can't remember it.
+// Members sign up and log in with just Name + Username + Password — no
+// email required. Behind the scenes this uses Supabase's normal email
+// auth with a deterministic synthetic address derived from the
+// username; the member never sees or types that address.
 export default function MemberLogin() {
   const navigate = useNavigate()
-  const [mode, setMode] = useState('password') // 'password' | 'link' | 'forgot'
-  const [sent, setSent] = useState(false)
-  const [resetSent, setResetSent] = useState(false)
+  const [mode, setMode] = useState('login') // 'login' | 'signup'
 
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
-  async function loginWithPassword(e) {
+  async function handleLogin(e) {
     e.preventDefault()
     setError('')
+    if (!isValidUsername(username)) {
+      setError('Enter your username to sign in.')
+      return
+    }
     setBusy(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({
+        email: usernameToEmail(username),
+        password,
+      })
       if (error) throw error
       navigate('/member', { replace: true })
     } catch (err) {
@@ -39,41 +43,34 @@ export default function MemberLogin() {
     }
   }
 
-  async function requestLink(e) {
+  async function handleSignup(e) {
     e.preventDefault()
     setError('')
+    if (!isValidUsername(username)) {
+      setError('Username must be 3-20 characters: lowercase letters, numbers, and underscores only.')
+      return
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+    if (password !== confirm) {
+      setError("Passwords don't match.")
+      return
+    }
     setBusy(true)
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
+      const { error } = await supabase.auth.signUp({
+        email: usernameToEmail(username),
+        password,
         options: {
-          shouldCreateUser: true,
-          data: { name, role: 'member' },
-          emailRedirectTo: `${window.location.origin}/`,
+          data: { name, username, role: 'member', has_password: true },
         },
       })
       if (error) throw error
-      setSent(true)
+      navigate('/member', { replace: true })
     } catch (err) {
-      console.error('Failed to send login link:', err)
-      setError(friendlyAuthError(err))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  async function requestPasswordReset(e) {
-    e.preventDefault()
-    setError('')
-    setBusy(true)
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      })
-      if (error) throw error
-      setResetSent(true)
-    } catch (err) {
-      console.error('Failed to send password reset:', err)
+      console.error('Signup failed:', err)
       setError(friendlyAuthError(err))
     } finally {
       setBusy(false)
@@ -86,14 +83,22 @@ export default function MemberLogin() {
         <Link to="/" className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1 mb-4">
           <span aria-hidden="true">←</span> Back to Home
         </Link>
-        <h1 className="font-display font-bold text-xl mb-1">Member Login</h1>
+        <h1 className="font-display font-bold text-xl mb-1">
+          {mode === 'login' ? 'Member Login' : 'Create Your Account'}
+        </h1>
 
-        {mode === 'password' && (
+        {mode === 'login' ? (
           <>
-            <p className="text-sm text-ink/60 mb-6">Sign in with your email and password.</p>
-            <form onSubmit={loginWithPassword}>
-              <Field label="Email">
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" />
+            <p className="text-sm text-ink/60 mb-6">Sign in with your username and password.</p>
+            <form onSubmit={handleLogin}>
+              <Field label="Username">
+                <Input
+                  value={username}
+                  onChange={e => setUsername(e.target.value.toLowerCase())}
+                  required
+                  placeholder="e.g. nakatosarah"
+                  autoCapitalize="none"
+                />
               </Field>
               <Field label="Password">
                 <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
@@ -103,102 +108,54 @@ export default function MemberLogin() {
                 {busy ? 'Signing in…' : 'Login'}
               </Button>
             </form>
-            <div className="flex flex-col items-center gap-2 mt-4">
-              <button
-                type="button"
-                className="text-sm text-forest underline"
-                onClick={() => { setMode('link'); setError('') }}
-              >
-                New here, or haven't set a password? Get a login link
-              </button>
-              <button
-                type="button"
-                className="text-sm text-ink/50 underline"
-                onClick={() => { setMode('forgot'); setError(''); setResetSent(false) }}
-              >
-                Forgot your password?
-              </button>
-            </div>
+            <p className="text-xs text-ink/50 text-center mt-4">
+              Forgotten your password? Ask your Association admin to set a new one for you.
+            </p>
+            <button
+              type="button"
+              className="text-sm text-forest underline mt-3 block mx-auto"
+              onClick={() => { setMode('signup'); setError('') }}
+            >
+              New here? Create an account
+            </button>
           </>
-        )}
-
-        {mode === 'link' && !sent && (
+        ) : (
           <>
             <p className="text-sm text-ink/60 mb-6">
-              Enter your name and email — we'll send you a link to sign in.
+              Choose a username and password — no email needed.
             </p>
-            <form onSubmit={requestLink}>
+            <form onSubmit={handleSignup}>
               <Field label="Full Name">
                 <Input value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. Nakato Sarah" />
               </Field>
-              <Field label="Email">
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" />
+              <Field label="Username" hint="Lowercase letters, numbers, and underscores only.">
+                <Input
+                  value={username}
+                  onChange={e => setUsername(e.target.value.toLowerCase())}
+                  required
+                  placeholder="e.g. nakatosarah"
+                  autoCapitalize="none"
+                />
+              </Field>
+              <Field label="Password">
+                <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
+              </Field>
+              <Field label="Confirm Password">
+                <Input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required minLength={6} />
               </Field>
               {error && <p className="text-clay text-sm mb-3">{error}</p>}
               <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? 'Sending link…' : 'Send Login Link'}
+                {busy ? 'Creating account…' : 'Create Account'}
               </Button>
             </form>
             <button
               type="button"
               className="text-sm text-forest underline mt-4 block mx-auto"
-              onClick={() => { setMode('password'); setError('') }}
+              onClick={() => { setMode('login'); setError('') }}
             >
-              Already have a password? Login instead
+              Already have an account? Login
             </button>
           </>
-        )}
-
-        {mode === 'link' && sent && (
-          <div>
-            <p className="text-sm text-ink/70 mb-4">
-              We've sent a sign-in link to <span className="font-medium">{email}</span>.
-              Open your email on this device and tap the link to continue — it will
-              bring you straight back here, signed in.
-            </p>
-            <p className="text-xs text-ink/50 mb-4">
-              Once you're in, set a password from your dashboard so you can log in directly next time.
-            </p>
-            <Button variant="ghost" className="w-full" onClick={() => setSent(false)}>
-              Use a different email
-            </Button>
-          </div>
-        )}
-
-        {mode === 'forgot' && !resetSent && (
-          <>
-            <p className="text-sm text-ink/60 mb-6">
-              Enter your email and we'll send you a link to set a new password.
-            </p>
-            <form onSubmit={requestPasswordReset}>
-              <Field label="Email">
-                <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" />
-              </Field>
-              {error && <p className="text-clay text-sm mb-3">{error}</p>}
-              <Button type="submit" className="w-full" disabled={busy}>
-                {busy ? 'Sending…' : 'Send Reset Link'}
-              </Button>
-            </form>
-            <button
-              type="button"
-              className="text-sm text-forest underline mt-4 block mx-auto"
-              onClick={() => { setMode('password'); setError('') }}
-            >
-              Back to Login
-            </button>
-          </>
-        )}
-
-        {mode === 'forgot' && resetSent && (
-          <div>
-            <p className="text-sm text-ink/70 mb-4">
-              We've sent a password reset link to <span className="font-medium">{email}</span>.
-              Open it on this device to set a new password.
-            </p>
-            <Button variant="ghost" className="w-full" onClick={() => { setMode('password'); setResetSent(false) }}>
-              Back to Login
-            </Button>
-          </div>
         )}
       </Card>
     </div>

@@ -8,7 +8,6 @@ import ErrorBoundary from './components/ErrorBoundary'
 import Landing from './pages/Landing'
 import MemberLogin from './pages/auth/MemberLogin'
 import AdminLogin from './pages/auth/AdminLogin'
-import ResetPassword from './pages/auth/ResetPassword'
 
 import MemberDashboard from './pages/member/MemberDashboard'
 import MemberProfile from './pages/member/MemberProfile'
@@ -56,7 +55,6 @@ function AppShell() {
         {/* Auth */}
         <Route path="/member/login" element={page(<MemberLogin />)} />
         <Route path="/admin/login" element={page(<AdminLogin />)} />
-        <Route path="/reset-password" element={page(<ResetPassword />)} />
 
         {/* Member area */}
         <Route path="/member" element={page(<RequireMember><MemberDashboard /></RequireMember>)} />

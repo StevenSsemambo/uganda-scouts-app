@@ -12,7 +12,7 @@ export default function AdminCategoryAdmins() {
   const [categoryAdmins, setCategoryAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [category, setCategory] = useState(MEMBERSHIP_CATEGORIES[0].category)
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
@@ -49,12 +49,12 @@ export default function AdminCategoryAdmins() {
     try {
       const { data: found, error: findError } = await supabase
         .from('profiles')
-        .select('id, name, email, role')
-        .eq('email', email.trim())
+        .select('id, name, username, role')
+        .eq('username', username.trim().toLowerCase())
         .maybeSingle()
       if (findError) throw findError
       if (!found) {
-        setError('No registered account found with that email. They need to sign up as a member first (via the normal member login), then you can promote them here.')
+        setError('No registered account found with that username. They need to sign up as a member first, then you can promote them here.')
         return
       }
 
@@ -64,8 +64,8 @@ export default function AdminCategoryAdmins() {
         .eq('id', found.id)
       if (updateError) throw updateError
 
-      setStatus(`${found.name} (${found.email}) is now Category Admin for "${category}".`)
-      setEmail('')
+      setStatus(`${found.name} (@${found.username}) is now Category Admin for "${category}".`)
+      setUsername('')
       await load()
     } catch (err) {
       console.error('Failed to promote account:', err)
@@ -104,8 +104,14 @@ export default function AdminCategoryAdmins() {
       <Card className="max-w-lg mb-8">
         <h2 className="font-display font-semibold mb-4">Promote a Registered Account</h2>
         <form onSubmit={promote}>
-          <Field label="Their Email" hint="They must have already signed up once as a member.">
-            <Input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="person@example.com" />
+          <Field label="Their Username" hint="They must have already signed up once as a member.">
+            <Input
+              value={username}
+              onChange={e => setUsername(e.target.value.toLowerCase())}
+              required
+              placeholder="e.g. nakatosarah"
+              autoCapitalize="none"
+            />
           </Field>
           <Field label="Category to Manage">
             <Select value={category} onChange={e => setCategory(e.target.value)}>
@@ -134,7 +140,7 @@ export default function AdminCategoryAdmins() {
             <Card key={p.id} className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="font-medium">{p.name}</div>
-                <div className="text-sm text-ink/50">{p.email} · manages "{p.managed_category}"</div>
+                <div className="text-sm text-ink/50">@{p.username} · manages "{p.managed_category}"</div>
               </div>
               <Button variant="danger" disabled={demoteBusyId === p.id} onClick={() => demote(p.id)}>
                 {demoteBusyId === p.id ? 'Removing…' : 'Remove Access'}

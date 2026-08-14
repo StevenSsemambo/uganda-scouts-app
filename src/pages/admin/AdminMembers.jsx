@@ -4,13 +4,13 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { DISTRICTS } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
-import { Button, Card, Input, Select, EmptyState } from '../../components/ui'
+import { Button, Card, Field, Input, Select, EmptyState } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminMembers() {
-  const { isAdmin, user: currentUser } = useAuth()
+  const { isAdmin, isCategoryAdmin, isStaff, user: currentUser } = useAuth()
   const [members, setMembers] = useState([])
   const [profilesByUserId, setProfilesByUserId] = useState({})
   const [loading, setLoading] = useState(true)
@@ -20,6 +20,11 @@ export default function AdminMembers() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [toast, setToast] = useState('')
+
+  // Inline "set new password" form state
+  const [passwordTarget, setPasswordTarget] = useState(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState('')
 
   async function load() {
     setLoading(true)
@@ -34,14 +39,14 @@ export default function AdminMembers() {
       setMembers(rows)
 
       // Full admins can see everyone's profile — used to show whether a
-      // member is already a Category Admin, get their email for password
-      // resets/reports, and to toggle roles inline.
+      // member is already a Category Admin, get their username for
+      // reports, and to toggle roles inline.
       if (isAdmin) {
         const userIds = rows.map(m => m.user_id).filter(Boolean)
         if (userIds.length > 0) {
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, email, role, managed_category')
+            .select('id, username, role, managed_category')
             .in('id', userIds)
           if (profilesError) throw profilesError
           const map = {}
@@ -81,7 +86,7 @@ export default function AdminMembers() {
       return {
         member_id: m.member_code,
         name: m.full_name,
-        email: p?.email || '',
+        username: p?.username || '',
         category: m.category,
         district: m.district,
         membership_type: m.membership_type,
@@ -142,19 +147,37 @@ export default function AdminMembers() {
     }
   }
 
-  async function sendPasswordReset(member) {
-    const p = profilesByUserId[member.user_id]
-    if (!p?.email) return
-    setBusyId(member.id)
+  function openPasswordForm(member) {
+    setPasswordTarget(member)
+    setNewPassword('')
+    setPasswordError('')
+  }
+
+  async function submitNewPassword(e) {
+    e.preventDefault()
+    if (!passwordTarget?.user_id) return
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters.')
+      return
+    }
+    setPasswordError('')
+    setBusyId(passwordTarget.id)
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(p.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+      if (sessionError || !sessionData?.session) throw sessionError || new Error('No active session')
+
+      const { data, error } = await supabase.functions.invoke('admin-set-password', {
+        body: { userId: passwordTarget.user_id, newPassword },
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
       })
-      if (error) throw error
-      setToast(`Password reset link sent to ${p.email}.`)
+      if (error || data?.error) throw new Error(data?.error || error.message)
+
+      setToast(`New password set for ${passwordTarget.full_name}. Share it with them directly.`)
+      setPasswordTarget(null)
+      setNewPassword('')
     } catch (err) {
-      console.error('Failed to send password reset:', err)
-      setToast(friendlyError(err, "Couldn't send reset email."))
+      console.error('Failed to set password:', err)
+      setPasswordError(friendlyError(err, "Couldn't set the password."))
     } finally {
       setBusyId(null)
     }
@@ -196,12 +219,41 @@ export default function AdminMembers() {
           <h1 className="font-display font-bold text-2xl mb-1">Members</h1>
           <p className="text-ink/60">{filtered.length} of {members.length} members shown.</p>
         </div>
-        <Button onClick={exportCSV}>Download Full Report</Button>
+        {isAdmin && <Button onClick={exportCSV}>Download Full Report</Button>}
       </div>
 
       {toast && (
         <Card className="max-w-lg mb-4 bg-canvas-2">
           <p className="text-sm">{toast}</p>
+        </Card>
+      )}
+
+      {passwordTarget && (
+        <Card className="max-w-lg mb-4 border-ember/50">
+          <h3 className="font-display font-semibold mb-1">Set New Password</h3>
+          <p className="text-sm text-ink/60 mb-4">
+            For {passwordTarget.full_name}. Share this password with them directly (WhatsApp, phone, in person) —
+            there's no email involved.
+          </p>
+          <form onSubmit={submitNewPassword}>
+            <Field label="New Password">
+              <Input
+                type="text"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                required
+                minLength={6}
+                placeholder="At least 6 characters"
+              />
+            </Field>
+            {passwordError && <p className="text-clay text-sm mb-3">{passwordError}</p>}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={busyId === passwordTarget.id}>
+                {busyId === passwordTarget.id ? 'Saving…' : 'Set Password'}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setPasswordTarget(null)}>Cancel</Button>
+            </div>
+          </form>
         </Card>
       )}
 
@@ -238,7 +290,7 @@ export default function AdminMembers() {
               <tr className="text-left border-b border-khaki/60 bg-canvas-2">
                 <Th>Member ID</Th><Th>Name</Th><Th>Category</Th><Th>District</Th>
                 <Th>Type</Th><Th>Amount</Th><Th>Year</Th>
-                {isAdmin && <Th>Actions</Th>}
+                {isStaff && <Th>Actions</Th>}
               </tr>
             </thead>
             <tbody>
@@ -255,40 +307,44 @@ export default function AdminMembers() {
                     <Td>{m.membership_type}</Td>
                     <Td>{formatUGX(m.amount)}</Td>
                     <Td>{m.year}</Td>
-                    {isAdmin && (
+                    {isStaff && (
                       <Td>
                         <div className="flex flex-wrap gap-3">
-                          {isCategoryAdminForThis ? (
-                            <button
-                              className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
-                              disabled={busyId === m.id}
-                              onClick={() => demote(m)}
-                            >
-                              Remove Access
-                            </button>
-                          ) : (
-                            <button
-                              className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
-                              disabled={busyId === m.id || !m.user_id || isSelf}
-                              onClick={() => promote(m)}
-                            >
-                              Make Category Admin
-                            </button>
+                          {isAdmin && (
+                            isCategoryAdminForThis ? (
+                              <button
+                                className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
+                                disabled={busyId === m.id}
+                                onClick={() => demote(m)}
+                              >
+                                Remove Access
+                              </button>
+                            ) : (
+                              <button
+                                className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
+                                disabled={busyId === m.id || !m.user_id || isSelf}
+                                onClick={() => promote(m)}
+                              >
+                                Make Category Admin
+                              </button>
+                            )
                           )}
                           <button
                             className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
-                            disabled={busyId === m.id || !p?.email}
-                            onClick={() => sendPasswordReset(m)}
+                            disabled={busyId === m.id || !m.user_id}
+                            onClick={() => openPasswordForm(m)}
                           >
-                            Reset Password
+                            Set New Password
                           </button>
-                          <button
-                            className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
-                            disabled={busyId === m.id || !m.user_id || isSelf}
-                            onClick={() => deleteAccount(m)}
-                          >
-                            Delete Account
-                          </button>
+                          {isAdmin && (
+                            <button
+                              className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
+                              disabled={busyId === m.id || !m.user_id || isSelf}
+                              onClick={() => deleteAccount(m)}
+                            >
+                              Delete Account
+                            </button>
+                          )}
                         </div>
                       </Td>
                     )}

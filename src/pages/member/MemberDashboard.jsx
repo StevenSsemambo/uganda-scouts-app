@@ -3,16 +3,13 @@ import { Link } from 'react-router-dom'
 import Layout from '../../components/Layout'
 import CompleteRegistration from './CompleteRegistration'
 import { useMember } from '../../lib/useMember'
-import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabaseClient'
 import { Card, MemberBadge, Button } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
-import SetPasswordCard from '../../components/SetPasswordCard'
 import BankDetailsCard from '../../components/BankDetailsCard'
 
 export default function MemberDashboard() {
   const { member, loading, error: memberError, reload } = useMember()
-  const { hasPassword } = useAuth()
   const [hasVerifiedPayment, setHasVerifiedPayment] = useState(true) // default true so the banner doesn't flash before we know
 
   useEffect(() => {
@@ -64,8 +61,6 @@ export default function MemberDashboard() {
         Welcome{member.full_name ? `, ${member.full_name.split(' ')[0]}` : ''}
       </h1>
       <p className="text-ink/60 mb-6">Your membership overview for {member.year}.</p>
-
-      {!hasPassword && <SetPasswordCard />}
 
       {!hasVerifiedPayment && (
         <div className="mb-8">

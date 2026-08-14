@@ -7,9 +7,8 @@ export default function Landing() {
   const { user, profile, loading } = useAuth()
   const navigate = useNavigate()
 
-  // If someone lands here already signed in — most commonly right after
-  // clicking the email sign-in link — send them straight to their area
-  // instead of showing the generic landing page.
+  // If someone lands here already signed in, send them straight to
+  // their area instead of showing the generic landing page.
   useEffect(() => {
     if (loading || !user) return
     if (profile?.role === 'admin' || profile?.role === 'category_admin') {
