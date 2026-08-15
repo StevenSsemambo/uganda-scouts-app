@@ -40,16 +40,7 @@ export default function Landing() {
           </Button>
         </Link>
       </div>
-      <p className="text-[10px] tracking-[0.25em] text-ink/35 uppercase mt-10">Built by</p>
-      <div className="flex items-center gap-2.5 mt-1.5">
-        <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-forest to-ember text-canvas font-mono text-xs font-bold shadow-sm">
-          {'</>'}
-        </span>
-        <div className="text-left leading-tight">
-          <p className="font-display italic font-semibold text-ink text-lg">SayMyTech</p>
-          <p className="text-[9px] tracking-[0.2em] text-ink/45 uppercase -mt-1">Developers</p>
-        </div>
-      </div>
+      <p className="text-sm text-ink/60 font-medium mt-8">By SayMyTech Developers</p>
     </div>
   )
 }
