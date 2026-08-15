@@ -2,6 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { Button } from './ui'
 import NotificationBell from './NotificationBell'
+import PromotionModal from './PromotionModal'
 
 const memberLinks = [
   { to: '/member', label: 'My Dashboard', end: true },
@@ -53,6 +54,7 @@ export default function Layout({ children, area }) {
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-canvas">
+      <PromotionModal />
       <aside className="md:w-64 shrink-0 bg-forest text-canvas flex flex-col">
         {/* Mobile-only top bar — brand + notifications + a always-visible
             Sign Out button. Without this, small screens never showed a
