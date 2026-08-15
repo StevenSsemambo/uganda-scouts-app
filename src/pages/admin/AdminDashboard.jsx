@@ -45,9 +45,12 @@ export default function AdminDashboard() {
         totalVerified,
       })
 
-      // Full-admin-only breakdowns: members and verified totals per
-      // category and per district — also feeds the printable PDF summary.
-      if (isAdmin) {
+      // Members/payments breakdowns feed both the on-screen tables and the
+      // printable PDF summary. A District Admin gets this too -- Row Level
+      // Security already scopes both `members` and the payments join to
+      // just their own district, so this naturally becomes "my district's
+      // report" for them without any extra filtering here.
+      if (isAdmin || isDistrictAdmin) {
         const { data: verifiedWithBoth, error: joinError } = await supabase
           .from('payments')
           .select('member_id, amount, members(category, district)')
@@ -110,18 +113,19 @@ export default function AdminDashboard() {
       console.error('Failed to load dashboard stats:', err)
       setLoadError(friendlyError(err, 'Could not load the overview.'))
     }
-  }, [isAdmin])
+  }, [isAdmin, isDistrictAdmin])
 
   useEffect(() => { load() }, [load])
 
   function downloadPDF() {
-    if (!stats || !byCategory || !byDistrict) return
+    if (!stats || !byCategory) return
     setPdfError('')
     try {
       generateSummaryReportPDF({
         stats,
         byCategory,
-        byDistrict,
+        byDistrict: isAdmin ? byDistrict : null,
+        scopeLabel: isDistrictAdmin ? `District Report — ${managedDistrict}` : 'All Districts',
         generatedByName: profile?.name,
       })
     } catch (err) {
@@ -134,8 +138,8 @@ export default function AdminDashboard() {
     <Layout area="admin">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
         <h1 className="font-display font-bold text-2xl">Overview</h1>
-        {isAdmin && (
-          <Button onClick={downloadPDF} disabled={!stats || !byCategory || !byDistrict}>
+        {(isAdmin || isDistrictAdmin) && (
+          <Button onClick={downloadPDF} disabled={!stats || !byCategory}>
             Download PDF Summary
           </Button>
         )}
@@ -168,9 +172,11 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {isAdmin && byCategory && (
+      {(isAdmin || isDistrictAdmin) && byCategory && (
         <div className="mb-10">
-          <h2 className="font-display font-bold text-lg mb-3">Members &amp; Verified Income by Category</h2>
+          <h2 className="font-display font-bold text-lg mb-3">
+            {isDistrictAdmin ? `Members & Verified Income by Category — ${managedDistrict}` : 'Members & Verified Income by Category'}
+          </h2>
           <Card className="overflow-x-auto p-0">
             <table className="w-full text-sm">
               <thead>

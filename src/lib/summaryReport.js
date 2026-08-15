@@ -12,7 +12,7 @@ const MUTED = [90, 82, 95]
 // members + verified-income breakdown by category and by district.
 // This is what a board or district meeting would actually hand out,
 // unlike a raw CSV export.
-export function generateSummaryReportPDF({ stats, byCategory, byDistrict, generatedByName }) {
+export function generateSummaryReportPDF({ stats, byCategory, byDistrict, scopeLabel, generatedByName }) {
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const marginX = 40
@@ -26,7 +26,7 @@ export function generateSummaryReportPDF({ stats, byCategory, byDistrict, genera
   doc.text('Uganda Scouts Association', marginX, 36)
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(11)
-  doc.text('Membership & Financial Summary Report', marginX, 56)
+  doc.text(`Membership & Financial Summary Report${scopeLabel ? ' — ' + scopeLabel : ''}`, marginX, 56)
   doc.setFontSize(9)
   const generatedLine = `Generated ${new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}` +
     (generatedByName ? `  \u00b7  by ${generatedByName}` : '')
@@ -82,26 +82,30 @@ export function generateSummaryReportPDF({ stats, byCategory, byDistrict, genera
 
   y = doc.lastAutoTable.finalY + 30
 
-  // District breakdown table (own page if it won't fit cleanly)
-  if (y > doc.internal.pageSize.getHeight() - 150) {
-    doc.addPage()
-    y = 40
-  }
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(12)
-  doc.setTextColor(...INK)
-  doc.text('Members & Verified Income by District', marginX, y)
-  y += 8
+  // District breakdown table — only for the full admin's all-districts
+  // report; a District Admin's report is already scoped to one district,
+  // so repeating it as a one-row table adds nothing.
+  if (byDistrict) {
+    if (y > doc.internal.pageSize.getHeight() - 150) {
+      doc.addPage()
+      y = 40
+    }
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(12)
+    doc.setTextColor(...INK)
+    doc.text('Members & Verified Income by District', marginX, y)
+    y += 8
 
-  autoTable(doc, {
-    startY: y + 8,
-    margin: { left: marginX, right: marginX },
-    head: [['District', 'Members', 'Verified Income']],
-    body: byDistrict.map(r => [r.district, String(r.count), formatUGX(r.verifiedTotal)]),
-    headStyles: { fillColor: PURPLE, textColor: CANVAS, fontStyle: 'bold' },
-    styles: { fontSize: 9.5, textColor: INK, cellPadding: 6 },
-    alternateRowStyles: { fillColor: [237, 228, 243] },
-  })
+    autoTable(doc, {
+      startY: y + 8,
+      margin: { left: marginX, right: marginX },
+      head: [['District', 'Members', 'Verified Income']],
+      body: byDistrict.map(r => [r.district, String(r.count), formatUGX(r.verifiedTotal)]),
+      headStyles: { fillColor: PURPLE, textColor: CANVAS, fontStyle: 'bold' },
+      styles: { fontSize: 9.5, textColor: INK, cellPadding: 6 },
+      alternateRowStyles: { fillColor: [237, 228, 243] },
+    })
+  }
 
   // Footer page numbers
   const pageCount = doc.internal.getNumberOfPages()

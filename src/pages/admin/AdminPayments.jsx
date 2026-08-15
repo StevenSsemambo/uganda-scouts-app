@@ -7,6 +7,15 @@ import { formatUGX, formatDate } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
 import { friendlyError } from '../../lib/friendlyError'
 
+// The client specifically wants a payment's "reason" to show Primary vs
+// Secondary/Tertiary when the payer is a school, since a bare category
+// label doesn't make that distinction obvious at a glance.
+function schoolLevel(category) {
+  if (category === 'Unit Registration — Primary School') return 'Primary'
+  if (category === 'Unit Registration — Secondary / Tertiary') return 'Secondary / Tertiary'
+  return null
+}
+
 export default function AdminPayments() {
   const { user, isAdmin } = useAuth()
   const [payments, setPayments] = useState([])
@@ -23,7 +32,7 @@ export default function AdminPayments() {
     try {
       let query = supabase
         .from('payments')
-        .select('*, members(full_name, member_code, district, user_id)')
+        .select('*, members(full_name, member_code, district, user_id, category)')
         .order('created_at', { ascending: false })
       if (filter !== 'all') query = query.eq('status', filter)
       const { data, error } = await query
@@ -50,6 +59,20 @@ export default function AdminPayments() {
   const filteredPayments = useMemo(() => {
     return payments.filter(p => !districtFilter || p.members?.district === districtFilter)
   }, [payments, districtFilter])
+
+  // "How many schools paid for that" — counted from verified payments in
+  // the currently filtered view, distinct by member so a school with two
+  // payments for the same fee isn't double-counted, split by level since
+  // that's the distinction the client asked for.
+  const schoolsPaidSummary = useMemo(() => {
+    const seen = { Primary: new Set(), 'Secondary / Tertiary': new Set() }
+    for (const p of filteredPayments) {
+      if (p.status !== 'verified') continue
+      const level = schoolLevel(p.members?.category)
+      if (level) seen[level].add(p.member_id)
+    }
+    return { primary: seen.Primary.size, secondaryTertiary: seen['Secondary / Tertiary'].size }
+  }, [filteredPayments])
 
   async function updateStatus(payment, status) {
     setBusyId(payment.id)
@@ -90,6 +113,8 @@ export default function AdminPayments() {
       member_name: p.members?.full_name,
       member_id: p.members?.member_code,
       district: p.members?.district,
+      category: p.members?.category,
+      school_level: schoolLevel(p.members?.category) || '',
       purpose: p.purpose,
       amount: p.amount,
       method: p.payment_method,
@@ -127,6 +152,15 @@ export default function AdminPayments() {
       {actionError && (
         <Card className="max-w-lg mb-4 border-clay/50">
           <p className="text-sm text-clay">{actionError}</p>
+        </Card>
+      )}
+
+      {(schoolsPaidSummary.primary > 0 || schoolsPaidSummary.secondaryTertiary > 0) && (
+        <Card className="max-w-lg mb-4 bg-canvas-2">
+          <p className="text-sm">
+            <span className="font-semibold">Schools paid so far{districtFilter ? ` in ${districtFilter}` : ''}:</span>{' '}
+            {schoolsPaidSummary.primary} Primary, {schoolsPaidSummary.secondaryTertiary} Secondary/Tertiary
+          </p>
         </Card>
       )}
 

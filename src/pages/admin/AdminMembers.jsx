@@ -211,7 +211,12 @@ export default function AdminMembers() {
       // their behalf, not through their own self-service signup. They can
       // still be given a login later (Set New Password requires user_id,
       // so an account would need to be created separately if they want one).
-      const { error } = await supabase.from('members').insert({
+      // Return the inserted row so we can immediately open the payment
+      // form for this exact person — this is the real walk-in scenario:
+      // someone comes to the district admin, gives their details AND
+      // their money in the same visit, so the admin shouldn't have to
+      // find them again in the list to record the payment.
+      const { data: inserted, error } = await supabase.from('members').insert({
         user_id: null,
         full_name: registerForm.full_name.trim(),
         category: registerForm.category,
@@ -219,12 +224,13 @@ export default function AdminMembers() {
         district: registerForm.district.trim(),
         amount: fee.amount,
         year,
-      })
+      }).select().single()
       if (error) throw error
-      setToast(`${registerForm.full_name.trim()} has been registered.`)
+      setToast(`${registerForm.full_name.trim()} has been registered. Now record their payment below.`)
       setRegisterForm({ full_name: '', category: MEMBERSHIP_CATEGORIES[0].category, district: isDistrictAdmin ? managedDistrict : '' })
       setShowRegisterForm(false)
       await load()
+      openPaymentForm(inserted)
     } catch (err) {
       console.error('Failed to register member:', err)
       setRegisterError(friendlyError(err, "Couldn't register this member."))
@@ -350,9 +356,9 @@ export default function AdminMembers() {
               {showRegisterForm ? 'Cancel' : '+ Register Member'}
             </Button>
           )}
-          {isAdmin && (
+          {isStaff && (
             <Button onClick={exportCSV}>
-              {districtFilter || categoryFilter ? 'Download Filtered Report' : 'Download Full Report'}
+              {isDistrictAdmin ? 'Download My District Report' : (districtFilter || categoryFilter ? 'Download Filtered Report' : 'Download Full Report')}
             </Button>
           )}
         </div>
