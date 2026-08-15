@@ -351,7 +351,7 @@ export default function AdminMembers() {
           <p className="text-ink/60">{filtered.length} of {members.length} members shown.</p>
         </div>
         <div className="flex gap-3">
-          {isStaff && (
+          {isDistrictAdmin && (
             <Button variant={showRegisterForm ? 'ghost' : 'secondary'} onClick={() => setShowRegisterForm(s => !s)}>
               {showRegisterForm ? 'Cancel' : '+ Register Member'}
             </Button>
@@ -538,13 +538,15 @@ export default function AdminMembers() {
                               </button>
                             )
                           )}
-                          <button
-                            className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
-                            disabled={busyId === m.id}
-                            onClick={() => openPaymentForm(m)}
-                          >
-                            Report Payment
-                          </button>
+                          {isDistrictAdmin && (
+                            <button
+                              className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
+                              disabled={busyId === m.id}
+                              onClick={() => openPaymentForm(m)}
+                            >
+                              Report Payment
+                            </button>
+                          )}
                           <button
                             className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
                             disabled={busyId === m.id || !m.user_id}
