@@ -73,8 +73,8 @@ export function generateSummaryReportPDF({ stats, byCategory, byDistrict, genera
   autoTable(doc, {
     startY: y + 8,
     margin: { left: marginX, right: marginX },
-    head: [['Category', 'Members', 'Verified Income']],
-    body: byCategory.map(r => [r.category, String(r.count), formatUGX(r.verifiedTotal)]),
+    head: [['Category', 'Members', 'Paid', 'Verified Income']],
+    body: byCategory.map(r => [r.category, String(r.count), String(r.paidCount ?? 0), formatUGX(r.verifiedTotal)]),
     headStyles: { fillColor: PURPLE, textColor: CANVAS, fontStyle: 'bold' },
     styles: { fontSize: 9.5, textColor: INK, cellPadding: 6 },
     alternateRowStyles: { fillColor: [237, 228, 243] },

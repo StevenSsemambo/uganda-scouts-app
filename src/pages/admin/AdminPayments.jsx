@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
@@ -8,11 +8,12 @@ import { downloadCSV } from '../../lib/csv'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminPayments() {
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState('pending')
+  const [districtFilter, setDistrictFilter] = useState('')
   const [busyId, setBusyId] = useState(null)
   const [actionError, setActionError] = useState('')
 
@@ -38,6 +39,17 @@ export default function AdminPayments() {
   }
 
   useEffect(() => { load() }, [filter])
+
+  // District is free text now — build filter options from whatever's
+  // actually on these payments' member records, same pattern as Members.
+  const districtOptions = useMemo(() => {
+    const set = new Set(payments.map(p => p.members?.district).filter(Boolean))
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [payments])
+
+  const filteredPayments = useMemo(() => {
+    return payments.filter(p => !districtFilter || p.members?.district === districtFilter)
+  }, [payments, districtFilter])
 
   async function updateStatus(payment, status) {
     setBusyId(payment.id)
@@ -74,7 +86,7 @@ export default function AdminPayments() {
   }
 
   function exportCSV() {
-    downloadCSV('payments.csv', payments.map(p => ({
+    downloadCSV('payments.csv', filteredPayments.map(p => ({
       member_name: p.members?.full_name,
       member_id: p.members?.member_code,
       district: p.members?.district,
@@ -95,13 +107,19 @@ export default function AdminPayments() {
           <h1 className="font-display font-bold text-2xl mb-1">Verify Payments</h1>
           <p className="text-ink/60">Cross-check each entry against your bank/Mobile Money statement, then verify.</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex gap-3 flex-wrap">
           <Select value={filter} onChange={e => setFilter(e.target.value)} className="max-w-[160px]">
             <option value="pending">Pending</option>
             <option value="verified">Verified</option>
             <option value="rejected">Rejected</option>
             <option value="all">All</option>
           </Select>
+          {isAdmin && (
+            <Select value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} className="max-w-[180px]">
+              <option value="">All Districts</option>
+              {districtOptions.map(d => <option key={d} value={d}>{d}</option>)}
+            </Select>
+          )}
           <Button onClick={exportCSV}>Download CSV</Button>
         </div>
       </div>
@@ -119,11 +137,11 @@ export default function AdminPayments() {
           <p className="text-sm text-clay mb-3">{loadError}</p>
           <Button variant="ghost" onClick={load}>Try Again</Button>
         </Card>
-      ) : payments.length === 0 ? (
+      ) : filteredPayments.length === 0 ? (
         <EmptyState title="Nothing here" hint="No payments match this filter." />
       ) : (
         <div className="space-y-3">
-          {payments.map(p => (
+          {filteredPayments.map(p => (
             <Card key={p.id} className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <div className="font-medium">

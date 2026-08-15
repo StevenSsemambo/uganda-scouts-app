@@ -2,14 +2,17 @@ import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
-import { Button, Card, Field, Input, Select, EmptyState } from '../../components/ui'
+import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
+import { Button, Card, Field, Input, Select, EmptyState, DistrictInput } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import { downloadCSV } from '../../lib/csv'
 import { friendlyError } from '../../lib/friendlyError'
 
+const PAYMENT_PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
+const PAYMENT_METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', 'Cash to District Office', 'Other']
+
 export default function AdminMembers() {
-  const { isAdmin, isStaff, user: currentUser } = useAuth()
+  const { isAdmin, isDistrictAdmin, managedDistrict, isStaff, user: currentUser } = useAuth()
   const [members, setMembers] = useState([])
   const [profilesByUserId, setProfilesByUserId] = useState({})
   const [loading, setLoading] = useState(true)
@@ -24,6 +27,23 @@ export default function AdminMembers() {
   const [passwordTarget, setPasswordTarget] = useState(null)
   const [newPassword, setNewPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
+
+  // Inline "register a member on their behalf" form state — for a district
+  // admin collecting info/money from someone who reports it to them rather
+  // than registering themselves.
+  const [showRegisterForm, setShowRegisterForm] = useState(false)
+  const [registerForm, setRegisterForm] = useState({
+    full_name: '',
+    category: MEMBERSHIP_CATEGORIES[0].category,
+    district: '',
+  })
+  const [registerError, setRegisterError] = useState('')
+  const [registerBusy, setRegisterBusy] = useState(false)
+
+  // Inline "report a payment on their behalf" form state
+  const [paymentTarget, setPaymentTarget] = useState(null)
+  const [paymentForm, setPaymentForm] = useState(null)
+  const [paymentError, setPaymentError] = useState('')
 
   async function load() {
     setLoading(true)
@@ -63,6 +83,12 @@ export default function AdminMembers() {
   }
 
   useEffect(() => { load() }, [isAdmin])
+
+  useEffect(() => {
+    if (isDistrictAdmin && managedDistrict) {
+      setRegisterForm(f => ({ ...f, district: f.district || managedDistrict }))
+    }
+  }, [isDistrictAdmin, managedDistrict])
 
   useEffect(() => {
     if (!toast) return
@@ -168,6 +194,84 @@ export default function AdminMembers() {
     }
   }
 
+  function updateRegisterForm(key, value) {
+    setRegisterForm(f => ({ ...f, [key]: value }))
+  }
+
+  async function submitRegister(e) {
+    e.preventDefault()
+    setRegisterError('')
+    if (!registerForm.full_name.trim()) { setRegisterError('Enter their full name.'); return }
+    if (!registerForm.district.trim()) { setRegisterError('Enter the district.'); return }
+    setRegisterBusy(true)
+    try {
+      const fee = categoryFee(registerForm.category)
+      const year = new Date().getFullYear()
+      // No user_id — this member is registered by their district admin on
+      // their behalf, not through their own self-service signup. They can
+      // still be given a login later (Set New Password requires user_id,
+      // so an account would need to be created separately if they want one).
+      const { error } = await supabase.from('members').insert({
+        user_id: null,
+        full_name: registerForm.full_name.trim(),
+        category: registerForm.category,
+        membership_type: fee.membership_type,
+        district: registerForm.district.trim(),
+        amount: fee.amount,
+        year,
+      })
+      if (error) throw error
+      setToast(`${registerForm.full_name.trim()} has been registered.`)
+      setRegisterForm({ full_name: '', category: MEMBERSHIP_CATEGORIES[0].category, district: isDistrictAdmin ? managedDistrict : '' })
+      setShowRegisterForm(false)
+      await load()
+    } catch (err) {
+      console.error('Failed to register member:', err)
+      setRegisterError(friendlyError(err, "Couldn't register this member."))
+    } finally {
+      setRegisterBusy(false)
+    }
+  }
+
+  function openPaymentForm(member) {
+    setPaymentTarget(member)
+    setPaymentForm({
+      amount: member.amount ?? '',
+      purpose: member.category ? 'Registration Fee' : PAYMENT_PURPOSES[0],
+      payment_method: PAYMENT_METHODS[0],
+      reference_number: '',
+      payment_date: '',
+    })
+    setPaymentError('')
+  }
+
+  async function submitPayment(e) {
+    e.preventDefault()
+    if (!paymentTarget) return
+    setPaymentError('')
+    setBusyId(paymentTarget.id)
+    try {
+      const { error } = await supabase.from('payments').insert({
+        member_id: paymentTarget.id,
+        amount: Number(paymentForm.amount),
+        purpose: paymentForm.purpose,
+        payment_method: paymentForm.payment_method,
+        reference_number: paymentForm.reference_number,
+        payment_date: paymentForm.payment_date,
+        year: new Date(paymentForm.payment_date).getFullYear() || new Date().getFullYear(),
+      })
+      if (error) throw error
+      setToast(`Payment reported for ${paymentTarget.full_name}. It's pending verification.`)
+      setPaymentTarget(null)
+      setPaymentForm(null)
+    } catch (err) {
+      console.error('Failed to report payment:', err)
+      setPaymentError(friendlyError(err, "Couldn't report this payment."))
+    } finally {
+      setBusyId(null)
+    }
+  }
+
   function openPasswordForm(member) {
     setPasswordTarget(member)
     setNewPassword('')
@@ -240,12 +344,52 @@ export default function AdminMembers() {
           <h1 className="font-display font-bold text-2xl mb-1">Members</h1>
           <p className="text-ink/60">{filtered.length} of {members.length} members shown.</p>
         </div>
-        {isAdmin && <Button onClick={exportCSV}>Download Full Report</Button>}
+        <div className="flex gap-3">
+          {isStaff && (
+            <Button variant={showRegisterForm ? 'ghost' : 'secondary'} onClick={() => setShowRegisterForm(s => !s)}>
+              {showRegisterForm ? 'Cancel' : '+ Register Member'}
+            </Button>
+          )}
+          {isAdmin && (
+            <Button onClick={exportCSV}>
+              {districtFilter || categoryFilter ? 'Download Filtered Report' : 'Download Full Report'}
+            </Button>
+          )}
+        </div>
       </div>
 
       {toast && (
         <Card className="max-w-lg mb-4 bg-canvas-2">
           <p className="text-sm">{toast}</p>
+        </Card>
+      )}
+
+      {showRegisterForm && (
+        <Card className="max-w-lg mb-4 border-forest/30">
+          <h3 className="font-display font-semibold mb-1">Register a Member</h3>
+          <p className="text-sm text-ink/60 mb-4">
+            For someone who reported their details and payment to you directly, rather than
+            signing up themselves. They won't have a login unless you set one up separately.
+          </p>
+          <form onSubmit={submitRegister}>
+            <Field label="Full Name">
+              <Input value={registerForm.full_name} onChange={e => updateRegisterForm('full_name', e.target.value)} required />
+            </Field>
+            <Field label="Category" hint="Sets the membership type and fee automatically.">
+              <Select value={registerForm.category} onChange={e => updateRegisterForm('category', e.target.value)}>
+                {MEMBERSHIP_CATEGORIES.map(c => <option key={c.category} value={c.category}>{c.category}</option>)}
+              </Select>
+            </Field>
+            <Field label="District">
+              {isDistrictAdmin ? (
+                <div className="bg-canvas-2 rounded-lg px-3.5 py-2.5 text-sm">{managedDistrict}</div>
+              ) : (
+                <DistrictInput value={registerForm.district} onChange={e => updateRegisterForm('district', e.target.value)} required />
+              )}
+            </Field>
+            {registerError && <p className="text-clay text-sm mb-3">{registerError}</p>}
+            <Button type="submit" disabled={registerBusy}>{registerBusy ? 'Registering…' : 'Register Member'}</Button>
+          </form>
         </Card>
       )}
 
@@ -273,6 +417,44 @@ export default function AdminMembers() {
                 {busyId === passwordTarget.id ? 'Saving…' : 'Set Password'}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setPasswordTarget(null)}>Cancel</Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {paymentTarget && (
+        <Card className="max-w-lg mb-4 border-forest/30">
+          <h3 className="font-display font-semibold mb-1">Report a Payment</h3>
+          <p className="text-sm text-ink/60 mb-4">
+            For {paymentTarget.full_name}, based on what they reported to you. It goes in as
+            pending, same as a self-reported payment, until an admin verifies it.
+          </p>
+          <form onSubmit={submitPayment}>
+            <Field label="Purpose">
+              <Select value={paymentForm.purpose} onChange={e => setPaymentForm(f => ({ ...f, purpose: e.target.value }))}>
+                {PAYMENT_PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
+              </Select>
+            </Field>
+            <Field label="Amount Paid (UGX)">
+              <Input type="number" min="0" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))} required />
+            </Field>
+            <Field label="Payment Method">
+              <Select value={paymentForm.payment_method} onChange={e => setPaymentForm(f => ({ ...f, payment_method: e.target.value }))}>
+                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+              </Select>
+            </Field>
+            <Field label="Transaction Reference Number" hint="From the bank slip or Mobile Money confirmation SMS they showed you.">
+              <Input value={paymentForm.reference_number} onChange={e => setPaymentForm(f => ({ ...f, reference_number: e.target.value }))} required />
+            </Field>
+            <Field label="Payment Date">
+              <Input type="date" value={paymentForm.payment_date} onChange={e => setPaymentForm(f => ({ ...f, payment_date: e.target.value }))} required />
+            </Field>
+            {paymentError && <p className="text-clay text-sm mb-3">{paymentError}</p>}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={busyId === paymentTarget.id}>
+                {busyId === paymentTarget.id ? 'Submitting…' : 'Submit for Verification'}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setPaymentTarget(null)}>Cancel</Button>
             </div>
           </form>
         </Card>
@@ -350,6 +532,13 @@ export default function AdminMembers() {
                               </button>
                             )
                           )}
+                          <button
+                            className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
+                            disabled={busyId === m.id}
+                            onClick={() => openPaymentForm(m)}
+                          >
+                            Report Payment
+                          </button>
                           <button
                             className="text-xs text-forest font-medium hover:underline disabled:opacity-50"
                             disabled={busyId === m.id || !m.user_id}

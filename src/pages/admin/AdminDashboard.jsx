@@ -50,7 +50,7 @@ export default function AdminDashboard() {
       if (isAdmin) {
         const { data: verifiedWithBoth, error: joinError } = await supabase
           .from('payments')
-          .select('amount, members(category, district)')
+          .select('member_id, amount, members(category, district)')
           .eq('status', 'verified')
         if (joinError) throw joinError
 
@@ -62,17 +62,31 @@ export default function AdminDashboard() {
         }
         const catTotals = {}
         const distTotals = {}
+        // Distinct members with at least one verified payment, per category
+        // and per district — for school categories this is literally "how
+        // many schools have paid", since each school registers as one member.
+        const catPaidMembers = {}
+        const distPaidMembers = {}
         for (const p of verifiedWithBoth || []) {
           const cat = p.members?.category
           const dist = p.members?.district
-          if (cat) catTotals[cat] = (catTotals[cat] || 0) + Number(p.amount)
-          if (dist) distTotals[dist] = (distTotals[dist] || 0) + Number(p.amount)
+          if (cat) {
+            catTotals[cat] = (catTotals[cat] || 0) + Number(p.amount)
+            if (!catPaidMembers[cat]) catPaidMembers[cat] = new Set()
+            catPaidMembers[cat].add(p.member_id)
+          }
+          if (dist) {
+            distTotals[dist] = (distTotals[dist] || 0) + Number(p.amount)
+            if (!distPaidMembers[dist]) distPaidMembers[dist] = new Set()
+            distPaidMembers[dist].add(p.member_id)
+          }
         }
 
         setByCategory(
           MEMBERSHIP_CATEGORIES.map(c => ({
             category: c.category,
             count: catCounts[c.category] || 0,
+            paidCount: catPaidMembers[c.category]?.size || 0,
             verifiedTotal: catTotals[c.category] || 0,
           }))
         )
@@ -86,6 +100,7 @@ export default function AdminDashboard() {
             .map(d => ({
               district: d,
               count: distCounts[d] || 0,
+              paidCount: distPaidMembers[d]?.size || 0,
               verifiedTotal: distTotals[d] || 0,
             }))
             .sort((a, b) => b.count - a.count)
@@ -162,14 +177,21 @@ export default function AdminDashboard() {
                 <tr className="text-left border-b border-khaki/60 bg-canvas-2">
                   <th className="px-4 py-3 font-semibold text-ink/70">Category</th>
                   <th className="px-4 py-3 font-semibold text-ink/70">Members</th>
+                  <th className="px-4 py-3 font-semibold text-ink/70">Paid</th>
                   <th className="px-4 py-3 font-semibold text-ink/70">Verified Income</th>
                 </tr>
               </thead>
               <tbody>
                 {byCategory.map(row => (
                   <tr key={row.category} className="border-b border-khaki/30 last:border-0">
-                    <td className="px-4 py-3">{row.category}</td>
+                    <td className="px-4 py-3">
+                      {row.category}
+                      {row.category.startsWith('Unit Registration') && (
+                        <span className="block text-xs text-ink/40">{row.paidCount} school{row.paidCount === 1 ? '' : 's'} paid</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">{row.count}</td>
+                    <td className="px-4 py-3">{row.paidCount}</td>
                     <td className="px-4 py-3">{formatUGX(row.verifiedTotal)}</td>
                   </tr>
                 ))}
