@@ -49,7 +49,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6">
+    <div className="min-h-screen bg-canvas flex items-center justify-center px-6">
       <Card className="w-full max-w-sm">
         <Link to="/" className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1 mb-4">
           <span aria-hidden="true">←</span> Back to Home
@@ -73,12 +73,12 @@ export default function AdminLogin() {
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign In'}
           </Button>
+          <p className="text-sm text-ink/60 text-center font-medium mt-3">By SayMyTech Developers</p>
         </form>
         <p className="text-xs text-ink/50 text-center mt-4">
           Forgotten your password? Another admin can set a new one for you from the Members page.
         </p>
       </Card>
-      <p className="text-xs text-ink/35 mt-6">By SayMyTech Developers</p>
     </div>
   )
 }
