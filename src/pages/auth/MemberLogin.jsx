@@ -29,12 +29,28 @@ export default function MemberLogin() {
     }
     setBusy(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: usernameToEmail(username),
         password,
       })
       if (error) throw error
-      navigate('/member', { replace: true })
+
+      // A member promoted to District Admin (or full Admin) still uses
+      // this same login page and the same credentials -- there's no
+      // separate admin login they'd know to use instead. Without this
+      // check they'd land on /member every time regardless of their
+      // actual role, with no obvious way to reach their real dashboard.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .maybeSingle()
+
+      if (profile?.role === 'admin' || profile?.role === 'district_admin') {
+        navigate('/admin', { replace: true })
+      } else {
+        navigate('/member', { replace: true })
+      }
     } catch (err) {
       console.error('Login failed:', err)
       setError(friendlyAuthError(err))
