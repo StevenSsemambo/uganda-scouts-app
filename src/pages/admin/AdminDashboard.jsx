@@ -5,7 +5,7 @@ import { Button, Card } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { formatUGX } from '../../lib/format'
-import { generateSummaryReportPDF } from '../../lib/summaryReport'
+import { generateSummaryReportPDF, generatePerDistrictReportPDF } from '../../lib/summaryReport'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminDashboard() {
@@ -13,6 +13,7 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null)
   const [byCategory, setByCategory] = useState(null)
   const [byDistrict, setByDistrict] = useState(null)
+  const [byDistrictSections, setByDistrictSections] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [pdfError, setPdfError] = useState('')
 
@@ -97,17 +98,58 @@ export default function AdminDashboard() {
         // Only districts that actually appear in the data, sorted by member
         // count. District is free text now, so this is derived from what
         // people typed rather than a fixed ~130-item official list.
-        setByDistrict(
-          Object.keys(distCounts)
-            .filter(d => distCounts[d] > 0)
-            .map(d => ({
-              district: d,
-              count: distCounts[d] || 0,
-              paidCount: distPaidMembers[d]?.size || 0,
-              verifiedTotal: distTotals[d] || 0,
+        const districtList = Object.keys(distCounts)
+          .filter(d => distCounts[d] > 0)
+          .map(d => ({
+            district: d,
+            count: distCounts[d] || 0,
+            paidCount: distPaidMembers[d]?.size || 0,
+            verifiedTotal: distTotals[d] || 0,
+          }))
+          .sort((a, b) => a.district.localeCompare(b.district))
+
+        setByDistrict([...districtList].sort((a, b) => b.count - a.count))
+
+        // For the full admin's per-district sectioned report: the same
+        // category breakdown as above, but computed separately within
+        // each district, so each district's section is self-contained --
+        // exactly what a district admin would print for just their own
+        // district, stacked one after another in one PDF.
+        if (isAdmin) {
+          const catCountsByDistrict = {}
+          const catTotalsByDistrict = {}
+          const catPaidByDistrict = {}
+          for (const m of members || []) {
+            if (!catCountsByDistrict[m.district]) catCountsByDistrict[m.district] = {}
+            catCountsByDistrict[m.district][m.category] = (catCountsByDistrict[m.district][m.category] || 0) + 1
+          }
+          for (const p of verifiedWithBoth || []) {
+            const cat = p.members?.category
+            const dist = p.members?.district
+            if (!cat || !dist) continue
+            if (!catTotalsByDistrict[dist]) catTotalsByDistrict[dist] = {}
+            if (!catPaidByDistrict[dist]) catPaidByDistrict[dist] = {}
+            catTotalsByDistrict[dist][cat] = (catTotalsByDistrict[dist][cat] || 0) + Number(p.amount)
+            if (!catPaidByDistrict[dist][cat]) catPaidByDistrict[dist][cat] = new Set()
+            catPaidByDistrict[dist][cat].add(p.member_id)
+          }
+
+          setByDistrictSections(
+            districtList.map(d => ({
+              district: d.district,
+              count: d.count,
+              verifiedTotal: d.verifiedTotal,
+              categories: MEMBERSHIP_CATEGORIES
+                .map(c => ({
+                  category: c.category,
+                  count: catCountsByDistrict[d.district]?.[c.category] || 0,
+                  paidCount: catPaidByDistrict[d.district]?.[c.category]?.size || 0,
+                  verifiedTotal: catTotalsByDistrict[d.district]?.[c.category] || 0,
+                }))
+                .filter(c => c.count > 0), // skip categories nobody in this district registered under
             }))
-            .sort((a, b) => b.count - a.count)
-        )
+          )
+        }
       }
     } catch (err) {
       console.error('Failed to load dashboard stats:', err)
@@ -134,15 +176,37 @@ export default function AdminDashboard() {
     }
   }
 
+  function downloadPerDistrictPDF() {
+    if (!stats || !byDistrictSections) return
+    setPdfError('')
+    try {
+      generatePerDistrictReportPDF({
+        stats,
+        byDistrictSections,
+        generatedByName: profile?.name,
+      })
+    } catch (err) {
+      console.error('Failed to generate per-district PDF:', err)
+      setPdfError("Couldn't generate the PDF. Please try again.")
+    }
+  }
+
   return (
     <Layout area="admin">
       <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
         <h1 className="font-display font-bold text-2xl">Overview</h1>
-        {(isAdmin || isDistrictAdmin) && (
-          <Button onClick={downloadPDF} disabled={!stats || !byCategory}>
-            Download PDF Summary
-          </Button>
-        )}
+        <div className="flex gap-3 flex-wrap">
+          {(isAdmin || isDistrictAdmin) && (
+            <Button onClick={downloadPDF} disabled={!stats || !byCategory}>
+              Download PDF Summary
+            </Button>
+          )}
+          {isAdmin && (
+            <Button variant="secondary" onClick={downloadPerDistrictPDF} disabled={!stats || !byDistrictSections}>
+              Download Per-District Report
+            </Button>
+          )}
+        </div>
       </div>
       <p className="text-ink/60 mb-8">
         {isDistrictAdmin
