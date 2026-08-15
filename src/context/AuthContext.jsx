@@ -63,6 +63,33 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // Without this, a promotion/demotion (or a district reassignment) done
+  // by another admin only takes effect for someone already signed in once
+  // they manually refresh or log back in — the notification about it would
+  // arrive live (that's a separate realtime subscription), but the actual
+  // role driving the dashboard, nav links, and available actions would
+  // stay stale in memory. This mirrors the same postgres_changes pattern
+  // already used for notifications, just scoped to the signed-in user's
+  // own profile row instead.
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+    let channel
+    try {
+      channel = supabase
+        .channel(`profile:${userId}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+          (payload) => setProfile(payload.new)
+        )
+        .subscribe()
+    } catch (err) {
+      console.error('Failed to subscribe to profile changes:', err)
+    }
+    return () => { if (channel) supabase.removeChannel(channel) }
+  }, [session?.user?.id])
+
   async function signOut() {
     try {
       await supabase.auth.signOut()
