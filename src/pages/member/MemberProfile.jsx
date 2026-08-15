@@ -4,9 +4,8 @@ import Layout from '../../components/Layout'
 import { useMember } from '../../lib/useMember'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { DISTRICTS, districtCode } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
-import { Button, Card, Field, Input, Select } from '../../components/ui'
+import { Button, Card, Field, Input, Select, DistrictInput } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import { friendlyError } from '../../lib/friendlyError'
 
@@ -58,8 +57,7 @@ export default function MemberProfile() {
           full_name: form.full_name,
           category: form.category,
           membership_type: form.membership_type,
-          district: form.district,
-          district_code: districtCode(form.district),
+          district: form.district.trim(),
           amount: form.amount,
         })
         .eq('id', member.id)
@@ -124,9 +122,7 @@ export default function MemberProfile() {
             </Select>
           </Field>
           <Field label="District">
-            <Select value={form.district} onChange={e => update('district', e.target.value)}>
-              {DISTRICTS.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
-            </Select>
+            <DistrictInput value={form.district} onChange={e => update('district', e.target.value)} required />
           </Field>
 
           <div className="bg-canvas-2 rounded-lg p-4 mb-5 flex items-center justify-between">

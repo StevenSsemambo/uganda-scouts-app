@@ -34,7 +34,7 @@ export default function AdminLogin() {
         .maybeSingle()
       if (profileError) throw profileError
 
-      if (profile?.role !== 'admin' && profile?.role !== 'category_admin') {
+      if (profile?.role !== 'admin' && profile?.role !== 'district_admin') {
         await supabase.auth.signOut()
         setError('This account is not registered as an admin.')
         return

@@ -1,4 +1,6 @@
 // Small shared UI primitives, styled from the design tokens in index.css.
+import { DISTRICT_SUGGESTIONS } from '../data/districts'
+
 export function Button({ children, variant = 'primary', className = '', ...props }) {
   const base = 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
   const variants = {
@@ -49,6 +51,28 @@ export function Select({ children, ...props }) {
     >
       {children}
     </select>
+  )
+}
+
+// Free-text district entry with datalist suggestions (see data/districts.js).
+// Replaces the old fixed-dropdown <Select> — the person can type any
+// district, the suggestions just speed up typing common ones.
+export function DistrictInput({ value, onChange, required, placeholder = 'e.g. Jinja' }) {
+  return (
+    <>
+      <input
+        list="district-suggestions"
+        className="w-full rounded-lg border border-khaki-dark/60 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-forest/40 focus:border-forest"
+        value={value}
+        onChange={onChange}
+        required={required}
+        placeholder={placeholder}
+        autoComplete="off"
+      />
+      <datalist id="district-suggestions">
+        {DISTRICT_SUGGESTIONS.map(d => <option key={d} value={d} />)}
+      </datalist>
+    </>
   )
 }
 

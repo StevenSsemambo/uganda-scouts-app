@@ -18,7 +18,7 @@ import AdminDashboard from './pages/admin/AdminDashboard'
 import AdminMembers from './pages/admin/AdminMembers'
 import AdminPayments from './pages/admin/AdminPayments'
 import AdminModulePage from './pages/admin/AdminModulePage'
-import AdminCategoryAdmins from './pages/admin/AdminCategoryAdmins'
+import AdminDistrictAdmins from './pages/admin/AdminDistrictAdmins'
 import AdminBankDetails from './pages/admin/AdminBankDetails'
 import SendMessage from './pages/admin/SendMessage'
 import AdminAccount from './pages/admin/AdminAccount'
@@ -62,7 +62,7 @@ function AppShell() {
         <Route path="/member/payments" element={page(<RequireMember><MemberPayments /></RequireMember>)} />
         <Route path="/member/submit" element={page(<RequireMember><SubmitInfo /></RequireMember>)} />
 
-        {/* Shared staff area — full Admin and Category Admin (RLS scopes the data) */}
+        {/* Shared staff area — full Admin and District Admin (RLS scopes the data) */}
         <Route path="/admin" element={page(<RequireStaff><AdminDashboard /></RequireStaff>)} />
         <Route path="/admin/members" element={page(<RequireStaff><AdminMembers /></RequireStaff>)} />
         <Route path="/admin/payments" element={page(<RequireStaff><AdminPayments /></RequireStaff>)} />
@@ -71,7 +71,7 @@ function AppShell() {
 
         {/* Full Admin only */}
         <Route path="/admin/modules/:moduleKey" element={page(<RequireAdmin><AdminModulePage /></RequireAdmin>)} />
-        <Route path="/admin/category-admins" element={page(<RequireAdmin><AdminCategoryAdmins /></RequireAdmin>)} />
+        <Route path="/admin/district-admins" element={page(<RequireAdmin><AdminDistrictAdmins /></RequireAdmin>)} />
         <Route path="/admin/bank-details" element={page(<RequireAdmin><AdminBankDetails /></RequireAdmin>)} />
 
         <Route path="*" element={page(<Landing />)} />

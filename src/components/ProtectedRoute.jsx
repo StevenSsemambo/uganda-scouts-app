@@ -8,21 +8,21 @@ export function RequireMember({ children }) {
   return children
 }
 
-// Any staff member — full Admin or a category-scoped Category Admin.
+// Any staff member — full Admin or a district-scoped District Admin.
 // Used for the shared areas (Overview, Members, Verify Payments) where
-// row-level security already scopes what a Category Admin can see.
+// row-level security already scopes what a District Admin can see.
 export function RequireStaff({ children }) {
   const { user, profile, loading } = useAuth()
   if (loading) return <CenteredLoader />
   if (!user) return <Navigate to="/admin/login" replace />
-  if (profile && profile.role !== 'admin' && profile.role !== 'category_admin') {
+  if (profile && profile.role !== 'admin' && profile.role !== 'district_admin') {
     return <Navigate to="/" replace />
   }
   return children
 }
 
 // Full Admin only — used for the reference-data modules and for managing
-// Category Admin accounts, which are association-wide, not category-scoped.
+// District Admin accounts, which are association-wide, not district-scoped.
 export function RequireAdmin({ children }) {
   const { user, profile, loading } = useAuth()
   if (loading) return <CenteredLoader />

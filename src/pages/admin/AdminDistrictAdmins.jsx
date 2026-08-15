@@ -1,19 +1,23 @@
 import { useEffect, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
-import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
-import { Button, Card, Field, Input, Select, EmptyState } from '../../components/ui'
+import { Button, Card, Field, Input, EmptyState } from '../../components/ui'
 import { friendlyError } from '../../lib/friendlyError'
 
 // Full-admin-only page for promoting an existing registered account
-// (member or otherwise) into a Category Admin scoped to one membership
-// category, or demoting one back to an ordinary member.
-export default function AdminCategoryAdmins() {
-  const [categoryAdmins, setCategoryAdmins] = useState([])
+// (member or otherwise) into a District Admin scoped to one district.
+// District Admin replaces the old Category Admin model: there is exactly
+// one District Admin login per district (not per category, not two people
+// each with their own login) — that one admin can share the credentials
+// with a second person in the district if they want help, per the client's
+// decision. The admin then collects data/money and submits it on behalf
+// of members in that district.
+export default function AdminDistrictAdmins() {
+  const [districtAdmins, setDistrictAdmins] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [username, setUsername] = useState('')
-  const [category, setCategory] = useState(MEMBERSHIP_CATEGORIES[0].category)
+  const [district, setDistrict] = useState('')
   const [error, setError] = useState('')
   const [status, setStatus] = useState('')
   const [busy, setBusy] = useState(false)
@@ -26,14 +30,14 @@ export default function AdminCategoryAdmins() {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('role', 'category_admin')
-        .order('managed_category')
+        .eq('role', 'district_admin')
+        .order('managed_district')
       if (error) throw error
-      setCategoryAdmins(data || [])
+      setDistrictAdmins(data || [])
     } catch (err) {
-      console.error('Failed to load Category Admins:', err)
-      setLoadError(friendlyError(err, 'Could not load Category Admins.'))
-      setCategoryAdmins([])
+      console.error('Failed to load District Admins:', err)
+      setLoadError(friendlyError(err, 'Could not load District Admins.'))
+      setDistrictAdmins([])
     } finally {
       setLoading(false)
     }
@@ -47,6 +51,27 @@ export default function AdminCategoryAdmins() {
     setStatus('')
     setBusy(true)
     try {
+      const districtName = district.trim()
+      if (!districtName) {
+        setError('Enter the district name.')
+        return
+      }
+
+      // One District Admin per district — surface a clear error instead of
+      // silently creating a second admin that RLS would then treat as a
+      // duplicate scope for the same district.
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('id, name, username')
+        .eq('role', 'district_admin')
+        .eq('managed_district', districtName)
+        .maybeSingle()
+      if (existingError) throw existingError
+      if (existing) {
+        setError(`${existing.name} (@${existing.username}) is already the District Admin for "${districtName}". Remove their access first if you want to replace them.`)
+        return
+      }
+
       const { data: found, error: findError } = await supabase
         .from('profiles')
         .select('id, name, username, role')
@@ -60,12 +85,13 @@ export default function AdminCategoryAdmins() {
 
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ role: 'category_admin', managed_category: category })
+        .update({ role: 'district_admin', managed_district: districtName })
         .eq('id', found.id)
       if (updateError) throw updateError
 
-      setStatus(`${found.name} (@${found.username}) is now Category Admin for "${category}".`)
+      setStatus(`${found.name} (@${found.username}) is now District Admin for "${districtName}".`)
       setUsername('')
+      setDistrict('')
       await load()
     } catch (err) {
       console.error('Failed to promote account:', err)
@@ -76,17 +102,17 @@ export default function AdminCategoryAdmins() {
   }
 
   async function demote(id) {
-    if (!confirm('Remove Category Admin access for this account? They will become a regular member again.')) return
+    if (!confirm('Remove District Admin access for this account? They will become a regular member again.')) return
     setDemoteBusyId(id)
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: 'member', managed_category: null })
+        .update({ role: 'member', managed_district: null })
         .eq('id', id)
       if (error) throw error
       await load()
     } catch (err) {
-      console.error('Failed to remove Category Admin access:', err)
+      console.error('Failed to remove District Admin access:', err)
       setError(friendlyError(err, "Couldn't remove access."))
     } finally {
       setDemoteBusyId(null)
@@ -95,10 +121,12 @@ export default function AdminCategoryAdmins() {
 
   return (
     <Layout area="admin">
-      <h1 className="font-display font-bold text-2xl mb-1">Category Admins</h1>
+      <h1 className="font-display font-bold text-2xl mb-1">District Admins</h1>
       <p className="text-ink/60 mb-6">
-        A Category Admin can view and manage members — and verify payments — only within the one
-        category they're assigned to (e.g. "Scout Leaders"). They sign in the same way members do.
+        A District Admin can view and manage members, submit records, and verify payments — only
+        within the one district they're assigned to. They can log in and enter data on behalf of
+        scouts from that district. Each district has exactly one District Admin login; the admin
+        can share their credentials with someone else helping them if needed.
       </p>
 
       <Card className="max-w-lg mb-8">
@@ -113,18 +141,21 @@ export default function AdminCategoryAdmins() {
               autoCapitalize="none"
             />
           </Field>
-          <Field label="Category to Manage">
-            <Select value={category} onChange={e => setCategory(e.target.value)}>
-              {MEMBERSHIP_CATEGORIES.map(c => <option key={c.category} value={c.category}>{c.category}</option>)}
-            </Select>
+          <Field label="District to Manage" hint="Type the district name as it should appear on records.">
+            <Input
+              value={district}
+              onChange={e => setDistrict(e.target.value)}
+              required
+              placeholder="e.g. Jinja"
+            />
           </Field>
           {error && <p className="text-clay text-sm mb-3">{error}</p>}
           {status && <p className="text-moss text-sm mb-3">{status}</p>}
-          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Make Category Admin'}</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Make District Admin'}</Button>
         </form>
       </Card>
 
-      <h2 className="font-display font-semibold text-lg mb-3">Current Category Admins</h2>
+      <h2 className="font-display font-semibold text-lg mb-3">Current District Admins</h2>
       {loading ? (
         <p className="text-ink/50">Loading…</p>
       ) : loadError ? (
@@ -132,15 +163,15 @@ export default function AdminCategoryAdmins() {
           <p className="text-sm text-clay mb-3">{loadError}</p>
           <Button variant="ghost" onClick={load}>Try Again</Button>
         </Card>
-      ) : categoryAdmins.length === 0 ? (
-        <EmptyState title="No Category Admins yet" hint="Promote someone using the form above." />
+      ) : districtAdmins.length === 0 ? (
+        <EmptyState title="No District Admins yet" hint="Promote someone using the form above." />
       ) : (
         <div className="space-y-3">
-          {categoryAdmins.map(p => (
+          {districtAdmins.map(p => (
             <Card key={p.id} className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <div className="font-medium">{p.name}</div>
-                <div className="text-sm text-ink/50">@{p.username} · manages "{p.managed_category}"</div>
+                <div className="text-sm text-ink/50">@{p.username} · manages "{p.managed_district}"</div>
               </div>
               <Button variant="danger" disabled={demoteBusyId === p.id} onClick={() => demote(p.id)}>
                 {demoteBusyId === p.id ? 'Removing…' : 'Remove Access'}

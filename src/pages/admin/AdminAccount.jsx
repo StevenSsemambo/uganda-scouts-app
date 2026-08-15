@@ -5,12 +5,12 @@ import { useAuth } from '../../context/AuthContext'
 import { Button, Card, Field, Input } from '../../components/ui'
 import { friendlyError } from '../../lib/friendlyError'
 
-// Lets any signed-in staff member (full Admin or Category Admin) change
+// Lets any signed-in staff member (full Admin or District Admin) change
 // their own password. Since they're already authenticated, Supabase
 // doesn't require re-entering the old password — same pattern as the
 // member-side "set a password" flow.
 export default function AdminAccount() {
-  const { profile, user, isAdmin, isCategoryAdmin, managedCategory, refreshProfile } = useAuth()
+  const { profile, user, isAdmin, isDistrictAdmin, managedDistrict, refreshProfile } = useAuth()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
@@ -50,7 +50,7 @@ export default function AdminAccount() {
       <p className="text-ink/60 mb-6">
         {profile?.name} · @{profile?.username}
         {isAdmin && ' · Full Admin'}
-        {isCategoryAdmin && ` · Category Admin (${managedCategory})`}
+        {isDistrictAdmin && ` · District Admin (${managedDistrict})`}
       </p>
 
       <Card className="max-w-md">

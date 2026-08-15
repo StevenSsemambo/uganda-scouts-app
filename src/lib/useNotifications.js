@@ -3,7 +3,7 @@ import { supabase } from './supabaseClient'
 import { useAuth } from '../context/AuthContext'
 
 // Loads the signed-in user's notifications and keeps them live via a
-// realtime subscription, so a freshly-promoted Category Admin (or a
+// realtime subscription, so a freshly-promoted District Admin (or a
 // member whose payment just got verified) sees it appear without
 // needing to refresh.
 export function useNotifications() {

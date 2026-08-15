@@ -9,7 +9,7 @@ export const MEMBERSHIP_CATEGORIES = [
   { category: 'Unit Registration — Primary School', membership_type: 'Annual', amount: 30000 },
   { category: 'Unit Registration — Secondary / Tertiary', membership_type: 'Annual', amount: 50000 },
   { category: 'Commissioners', membership_type: 'Annual', amount: 20000 },
-  { category: 'Trainers', membership_type: 'Annual', amount: 20000 },
+  { category: 'Woodbadge', membership_type: 'Annual', amount: 20000 },
   { category: 'Scout Leaders', membership_type: 'Annual', amount: 10000 },
   { category: 'Rover Scouts', membership_type: 'Annual', amount: 5000 },
   { category: 'Scouts (Cubs / Juniors / Ventures)', membership_type: 'Annual', amount: 3000 },

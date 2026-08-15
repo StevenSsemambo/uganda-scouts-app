@@ -4,13 +4,12 @@ import { supabase } from '../../lib/supabaseClient'
 import { Button, Card } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
-import { DISTRICTS } from '../../data/districts'
 import { formatUGX } from '../../lib/format'
 import { generateSummaryReportPDF } from '../../lib/summaryReport'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminDashboard() {
-  const { isAdmin, isCategoryAdmin, managedCategory, profile } = useAuth()
+  const { isAdmin, isDistrictAdmin, managedDistrict, profile } = useAuth()
   const [stats, setStats] = useState(null)
   const [byCategory, setByCategory] = useState(null)
   const [byDistrict, setByDistrict] = useState(null)
@@ -78,15 +77,16 @@ export default function AdminDashboard() {
           }))
         )
 
-        // Only districts with at least one member, sorted by member count
-        // — showing all ~130 official districts would mostly be zeros.
+        // Only districts that actually appear in the data, sorted by member
+        // count. District is free text now, so this is derived from what
+        // people typed rather than a fixed ~130-item official list.
         setByDistrict(
-          DISTRICTS
-            .filter(d => distCounts[d.name] > 0)
+          Object.keys(distCounts)
+            .filter(d => distCounts[d] > 0)
             .map(d => ({
-              district: d.name,
-              count: distCounts[d.name] || 0,
-              verifiedTotal: distTotals[d.name] || 0,
+              district: d,
+              count: distCounts[d] || 0,
+              verifiedTotal: distTotals[d] || 0,
             }))
             .sort((a, b) => b.count - a.count)
         )
@@ -126,8 +126,8 @@ export default function AdminDashboard() {
         )}
       </div>
       <p className="text-ink/60 mb-8">
-        {isCategoryAdmin
-          ? `Real-time totals for your category — "${managedCategory}".`
+        {isDistrictAdmin
+          ? `Real-time totals for your district — "${managedDistrict}".`
           : 'Real-time totals across every district.'}
       </p>
 

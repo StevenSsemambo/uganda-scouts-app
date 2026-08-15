@@ -22,13 +22,14 @@ export const MODULES = {
       { key: 'email', label: 'Email', type: 'email' },
     ],
   },
-  trainers: {
-    table: 'trainers',
-    label: 'Trainers',
-    singular: 'Trainer',
+  woodbadge: {
+    table: 'woodbadge',
+    label: 'Woodbadge',
+    singular: 'Woodbadge Entry',
     fields: [
-      { key: 'full_name', label: 'Name of Trainer', type: 'text', required: true },
+      { key: 'full_name', label: 'Name', type: 'text', required: true },
       { key: 'district', label: 'District', type: 'district', required: true },
+      { key: 'participation_type', label: 'Attending', type: 'select', options: ['Woodbadge', 'Training'], required: true },
     ],
   },
   scout_leaders: {

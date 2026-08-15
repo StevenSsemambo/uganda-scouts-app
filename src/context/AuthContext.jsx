@@ -78,11 +78,11 @@ export function AuthProvider({ children }) {
     user: session?.user ?? null,
     profile,
     // 'admin' = full admin, sees/manages everything.
-    // 'category_admin' = scoped admin, sees/manages only their assigned category (enforced by RLS).
+    // 'district_admin' = scoped admin, sees/manages only their assigned district (enforced by RLS).
     isAdmin: profile?.role === 'admin',
-    isCategoryAdmin: profile?.role === 'category_admin',
-    isStaff: profile?.role === 'admin' || profile?.role === 'category_admin',
-    managedCategory: profile?.managed_category || null,
+    isDistrictAdmin: profile?.role === 'district_admin',
+    isStaff: profile?.role === 'admin' || profile?.role === 'district_admin',
+    managedDistrict: profile?.managed_district || null,
     hasPassword: Boolean(profile?.has_password),
     loading,
     signOut,

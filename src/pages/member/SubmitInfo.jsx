@@ -3,8 +3,7 @@ import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { MODULES, MODULE_KEYS } from '../../data/modules'
-import { DISTRICTS } from '../../data/districts'
-import { Button, Card, Field, Input, Select } from '../../components/ui'
+import { Button, Card, Field, Input, Select, DistrictInput } from '../../components/ui'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function SubmitInfo() {
@@ -52,7 +51,7 @@ export default function SubmitInfo() {
     <Layout area="member">
       <h1 className="font-display font-bold text-2xl mb-1">Submit District Information</h1>
       <p className="text-ink/60 mb-6">
-        Add records for your district — Schools, Commissioners, Trainers, Scout Leaders, Rover Scouts,
+        Add records for your district — Schools, Commissioners, Woodbadge, Scout Leaders, Rover Scouts,
         Donors, District Leadership, or District Subscriptions. The admin can see and download everything submitted here.
       </p>
 
@@ -72,10 +71,7 @@ export default function SubmitInfo() {
                   {f.options.map(o => <option key={o} value={o}>{o}</option>)}
                 </Select>
               ) : f.type === 'district' ? (
-                <Select value={form[f.key] || ''} onChange={e => update(f.key, e.target.value)} required={f.required}>
-                  <option value="" disabled>Choose district…</option>
-                  {DISTRICTS.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
-                </Select>
+                <DistrictInput value={form[f.key] || ''} onChange={e => update(f.key, e.target.value)} required={f.required} />
               ) : (
                 <Input
                   type={f.type === 'number' ? 'number' : f.type === 'email' ? 'email' : 'text'}

@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { useMember } from '../../lib/useMember'
-import { DISTRICTS, districtCode } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
-import { Button, Card, Field, Input, Select } from '../../components/ui'
+import { Button, Card, Field, Input, Select, DistrictInput } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
 import BankDetailsCard from '../../components/BankDetailsCard'
 import { friendlyError } from '../../lib/friendlyError'
@@ -17,7 +16,7 @@ export default function CompleteRegistration() {
   const [form, setForm] = useState({
     full_name: profile?.name || '',
     category: MEMBERSHIP_CATEGORIES[0].category,
-    district: DISTRICTS[0].name,
+    district: '',
   })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -39,8 +38,7 @@ export default function CompleteRegistration() {
         full_name: form.full_name,
         category: form.category,
         membership_type: selectedFee.membership_type,
-        district: form.district,
-        district_code: districtCode(form.district),
+        district: form.district.trim(),
         amount: selectedFee.amount,
         year,
       }).select().single()
@@ -83,9 +81,7 @@ export default function CompleteRegistration() {
             </Select>
           </Field>
           <Field label="District" hint="Your member ID will be generated from this district.">
-            <Select value={form.district} onChange={e => update('district', e.target.value)}>
-              {DISTRICTS.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
-            </Select>
+            <DistrictInput value={form.district} onChange={e => update('district', e.target.value)} required />
           </Field>
 
           <div className="bg-canvas-2 rounded-lg p-4 mb-5 flex items-center justify-between">

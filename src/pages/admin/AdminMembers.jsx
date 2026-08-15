@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
-import { DISTRICTS } from '../../data/districts'
 import { MEMBERSHIP_CATEGORIES } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select, EmptyState } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
@@ -10,7 +9,7 @@ import { downloadCSV } from '../../lib/csv'
 import { friendlyError } from '../../lib/friendlyError'
 
 export default function AdminMembers() {
-  const { isAdmin, isCategoryAdmin, isStaff, user: currentUser } = useAuth()
+  const { isAdmin, isStaff, user: currentUser } = useAuth()
   const [members, setMembers] = useState([])
   const [profilesByUserId, setProfilesByUserId] = useState({})
   const [loading, setLoading] = useState(true)
@@ -39,14 +38,14 @@ export default function AdminMembers() {
       setMembers(rows)
 
       // Full admins can see everyone's profile — used to show whether a
-      // member is already a Category Admin, get their username for
+      // member is already a District Admin, get their username for
       // reports, and to toggle roles inline.
       if (isAdmin) {
         const userIds = rows.map(m => m.user_id).filter(Boolean)
         if (userIds.length > 0) {
           const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
-            .select('id, username, role, managed_category')
+            .select('id, username, role, managed_district')
             .in('id', userIds)
           if (profilesError) throw profilesError
           const map = {}
@@ -70,6 +69,14 @@ export default function AdminMembers() {
     const t = setTimeout(() => setToast(''), 4000)
     return () => clearTimeout(t)
   }, [toast])
+
+  // District is now free text, not a fixed dropdown list — so the filter
+  // options come from whatever districts actually appear in the data,
+  // sorted alphabetically, rather than a static ~130-item list.
+  const districtOptions = useMemo(() => {
+    const set = new Set(members.map(m => m.district).filter(Boolean))
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [members])
 
   const filtered = useMemo(() => {
     return members.filter(m => {
@@ -102,15 +109,29 @@ export default function AdminMembers() {
     if (!member.user_id) return
     setBusyId(member.id)
     try {
+      // One District Admin per district — check before promoting so we
+      // don't silently create a second admin scoped to the same district.
+      const { data: existing, error: existingError } = await supabase
+        .from('profiles')
+        .select('id, name, username')
+        .eq('role', 'district_admin')
+        .eq('managed_district', member.district)
+        .maybeSingle()
+      if (existingError) throw existingError
+      if (existing) {
+        setToast(`${existing.name} (@${existing.username}) is already the District Admin for "${member.district}". Remove their access first.`)
+        return
+      }
+
       const { error } = await supabase
         .from('profiles')
-        .update({ role: 'category_admin', managed_category: member.category })
+        .update({ role: 'district_admin', managed_district: member.district })
         .eq('id', member.user_id)
       if (error) throw error
       await supabase.from('notifications').insert({
         user_id: member.user_id,
         title: "You've been promoted!",
-        body: `You are now Category Admin for "${member.category}". You can view and manage members and payments in this category from your dashboard.`,
+        body: `You are now District Admin for "${member.district}". You can view and manage members and payments in this district from your dashboard.`,
         type: 'promotion',
       })
       await load()
@@ -124,18 +145,18 @@ export default function AdminMembers() {
 
   async function demote(member) {
     if (!member.user_id) return
-    if (!confirm(`Remove Category Admin access from ${member.full_name}?`)) return
+    if (!confirm(`Remove District Admin access from ${member.full_name}?`)) return
     setBusyId(member.id)
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ role: 'member', managed_category: null })
+        .update({ role: 'member', managed_district: null })
         .eq('id', member.user_id)
       if (error) throw error
       await supabase.from('notifications').insert({
         user_id: member.user_id,
-        title: 'Category Admin access removed',
-        body: `Your Category Admin access for "${member.category}" has been removed.`,
+        title: 'District Admin access removed',
+        body: `Your District Admin access for "${member.district}" has been removed.`,
         type: 'general',
       })
       await load()
@@ -266,7 +287,7 @@ export default function AdminMembers() {
         />
         <Select value={districtFilter} onChange={e => setDistrictFilter(e.target.value)} className="max-w-xs">
           <option value="">All Districts</option>
-          {DISTRICTS.map(d => <option key={d.code} value={d.name}>{d.name}</option>)}
+          {districtOptions.map(d => <option key={d} value={d}>{d}</option>)}
         </Select>
         <Select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="max-w-xs">
           <option value="">All Categories</option>
@@ -296,7 +317,7 @@ export default function AdminMembers() {
             <tbody>
               {filtered.map(m => {
                 const p = profilesByUserId[m.user_id]
-                const isCategoryAdminForThis = p?.role === 'category_admin' && p?.managed_category === m.category
+                const isDistrictAdminForThis = p?.role === 'district_admin' && p?.managed_district === m.district
                 const isSelf = m.user_id === currentUser?.id
                 return (
                   <tr key={m.id} className="border-b border-khaki/30 last:border-0">
@@ -311,7 +332,7 @@ export default function AdminMembers() {
                       <Td>
                         <div className="flex flex-wrap gap-3">
                           {isAdmin && (
-                            isCategoryAdminForThis ? (
+                            isDistrictAdminForThis ? (
                               <button
                                 className="text-xs text-ember font-medium hover:underline disabled:opacity-50"
                                 disabled={busyId === m.id}
@@ -325,7 +346,7 @@ export default function AdminMembers() {
                                 disabled={busyId === m.id || !m.user_id || isSelf}
                                 onClick={() => promote(m)}
                               >
-                                Make Category Admin
+                                Make District Admin
                               </button>
                             )
                           )}

@@ -10,8 +10,8 @@ const memberLinks = [
   { to: '/member/submit', label: 'Submit District Info' },
 ]
 
-// Shared by both full Admins and Category Admins — row-level security
-// automatically scopes what a Category Admin sees on these pages.
+// Shared by both full Admins and District Admins — row-level security
+// automatically scopes what a District Admin sees on these pages.
 const staffLinks = [
   { to: '/admin', label: 'Overview', end: true },
   { to: '/admin/members', label: 'Members' },
@@ -24,18 +24,18 @@ const staffLinks = [
 const fullAdminLinks = [
   { to: '/admin/modules/schools', label: 'Schools' },
   { to: '/admin/modules/commissioners', label: 'Commissioners' },
-  { to: '/admin/modules/trainers', label: 'Trainers' },
+  { to: '/admin/modules/woodbadge', label: 'Woodbadge' },
   { to: '/admin/modules/scout_leaders', label: 'Scout Leaders' },
   { to: '/admin/modules/rover_scouts', label: 'Rover Scouts' },
   { to: '/admin/modules/donors', label: 'Donors' },
   { to: '/admin/modules/district_leadership', label: 'District Leadership' },
   { to: '/admin/modules/district_subscriptions', label: 'District Subscriptions' },
-  { to: '/admin/category-admins', label: 'Category Admins' },
+  { to: '/admin/district-admins', label: 'District Admins' },
   { to: '/admin/bank-details', label: 'Bank Details' },
 ]
 
 export default function Layout({ children, area }) {
-  const { profile, isAdmin, isCategoryAdmin, managedCategory, signOut } = useAuth()
+  const { profile, isAdmin, isDistrictAdmin, managedDistrict, signOut } = useAuth()
   const navigate = useNavigate()
 
   let links = memberLinks
@@ -60,8 +60,8 @@ export default function Layout({ children, area }) {
         <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-canvas/10">
           <div>
             <div className="font-display font-bold text-base leading-tight">The USA</div>
-            {isCategoryAdmin && (
-              <div className="text-[10px] opacity-80 mt-0.5">Category Admin — {managedCategory}</div>
+            {isDistrictAdmin && (
+              <div className="text-[10px] opacity-80 mt-0.5">District Admin — {managedDistrict}</div>
             )}
           </div>
           <div className="flex items-center gap-1">
@@ -79,9 +79,9 @@ export default function Layout({ children, area }) {
           <div>
             <div className="font-display font-bold text-lg leading-tight">The USA</div>
             <div className="text-xs opacity-70 mt-0.5">Uganda Scouts Association</div>
-            {isCategoryAdmin && (
+            {isDistrictAdmin && (
               <div className="text-xs mt-2 bg-ember/20 text-ember-light rounded px-2 py-1 inline-block">
-                Category Admin — {managedCategory}
+                District Admin — {managedDistrict}
               </div>
             )}
           </div>
