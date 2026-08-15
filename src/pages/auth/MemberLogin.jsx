@@ -94,7 +94,7 @@ export default function MemberLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center px-6">
+    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6">
       <Card className="w-full max-w-sm">
         <Link to="/" className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1 mb-4">
           <span aria-hidden="true">←</span> Back to Home
@@ -174,6 +174,7 @@ export default function MemberLogin() {
           </>
         )}
       </Card>
+      <p className="text-xs text-ink/35 mt-6">By SayMyTech Developers</p>
     </div>
   )
 }
