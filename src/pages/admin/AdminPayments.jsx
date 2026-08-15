@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabaseClient'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, StatusPill, EmptyState, Select } from '../../components/ui'
 import { formatUGX, formatDate } from '../../lib/format'
-import { downloadCSV } from '../../lib/csv'
+import { downloadTablePDF } from '../../lib/tableReport'
 import { friendlyError } from '../../lib/friendlyError'
 
 // The client specifically wants a payment's "reason" to show Primary vs
@@ -108,21 +108,26 @@ export default function AdminPayments() {
     }
   }
 
-  function exportCSV() {
-    downloadCSV('payments.csv', filteredPayments.map(p => ({
-      member_name: p.members?.full_name,
-      member_id: p.members?.member_code,
-      district: p.members?.district,
-      category: p.members?.category,
-      school_level: schoolLevel(p.members?.category) || '',
-      purpose: p.purpose,
-      amount: p.amount,
-      method: p.payment_method,
-      reference: p.reference_number,
-      payment_date: p.payment_date,
-      status: p.status,
-      year: p.year,
-    })))
+  function exportPDF() {
+    downloadTablePDF({
+      title: 'Payments Report',
+      subtitle: `Filter: ${filter}${districtFilter ? `  ·  District: ${districtFilter}` : ''}`,
+      filename: `payments-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+      rows: filteredPayments.map(p => ({
+        member_name: p.members?.full_name,
+        member_id: p.members?.member_code,
+        district: p.members?.district,
+        category: p.members?.category,
+        school_level: schoolLevel(p.members?.category) || '',
+        purpose: p.purpose,
+        amount: p.amount,
+        method: p.payment_method,
+        reference: p.reference_number,
+        payment_date: p.payment_date,
+        status: p.status,
+        year: p.year,
+      })),
+    })
   }
 
   return (
@@ -145,7 +150,7 @@ export default function AdminPayments() {
               {districtOptions.map(d => <option key={d} value={d}>{d}</option>)}
             </Select>
           )}
-          <Button onClick={exportCSV}>Download CSV</Button>
+          <Button onClick={exportPDF}>Download PDF</Button>
         </div>
       </div>
 

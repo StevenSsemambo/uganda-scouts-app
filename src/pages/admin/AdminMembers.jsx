@@ -5,7 +5,7 @@ import { useAuth } from '../../context/AuthContext'
 import { MEMBERSHIP_CATEGORIES, categoryFee } from '../../data/membershipCategories'
 import { Button, Card, Field, Input, Select, EmptyState, DistrictInput } from '../../components/ui'
 import { formatUGX } from '../../lib/format'
-import { downloadCSV } from '../../lib/csv'
+import { downloadTablePDF } from '../../lib/tableReport'
 import { friendlyError } from '../../lib/friendlyError'
 
 const PAYMENT_PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
@@ -118,22 +118,30 @@ export default function AdminMembers() {
     })
   }, [members, search, districtFilter, categoryFilter])
 
-  function exportCSV() {
-    downloadCSV('members-report.csv', filtered.map(m => {
-      const p = profilesByUserId[m.user_id]
-      return {
-        member_id: m.member_code,
-        name: m.full_name,
-        username: p?.username || '',
-        category: m.category,
-        district: m.district,
-        membership_type: m.membership_type,
-        amount: m.amount,
-        year: m.year,
-        account_role: p?.role || '',
-        registered_on: m.created_at,
-      }
-    }))
+  function exportPDF() {
+    const scopeLabel = isDistrictAdmin
+      ? `District: ${managedDistrict}`
+      : (districtFilter || categoryFilter ? 'Filtered' : 'All Districts')
+    downloadTablePDF({
+      title: 'Members Report',
+      subtitle: scopeLabel,
+      filename: `members-report-${new Date().toISOString().slice(0, 10)}.pdf`,
+      rows: filtered.map(m => {
+        const p = profilesByUserId[m.user_id]
+        return {
+          member_id: m.member_code,
+          name: m.full_name,
+          username: p?.username || '',
+          category: m.category,
+          district: m.district,
+          membership_type: m.membership_type,
+          amount: m.amount,
+          year: m.year,
+          account_role: p?.role || '',
+          registered_on: m.created_at,
+        }
+      }),
+    })
   }
 
   async function promote(member) {
@@ -362,7 +370,7 @@ export default function AdminMembers() {
             </Button>
           )}
           {isStaff && (
-            <Button onClick={exportCSV}>
+            <Button onClick={exportPDF}>
               {isDistrictAdmin ? 'Download My District Report' : (districtFilter || categoryFilter ? 'Download Filtered Report' : 'Download Full Report')}
             </Button>
           )}

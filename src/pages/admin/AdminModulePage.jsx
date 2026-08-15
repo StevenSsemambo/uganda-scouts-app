@@ -4,7 +4,7 @@ import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabaseClient'
 import { MODULES } from '../../data/modules'
 import { Button, Card, EmptyState } from '../../components/ui'
-import { downloadCSV } from '../../lib/csv'
+import { downloadTablePDF } from '../../lib/tableReport'
 import { formatUGX } from '../../lib/format'
 import { friendlyError } from '../../lib/friendlyError'
 
@@ -55,8 +55,12 @@ export default function AdminModulePage() {
     }
   }
 
-  function exportCSV() {
-    downloadCSV(`${mod.table}.csv`, rows.map(({ id, submitted_by, ...rest }) => rest))
+  function exportPDF() {
+    downloadTablePDF({
+      title: mod.label,
+      filename: `${mod.table}-${new Date().toISOString().slice(0, 10)}.pdf`,
+      rows: rows.map(({ id, submitted_by, ...rest }) => rest),
+    })
   }
 
   if (!mod) {
@@ -72,7 +76,7 @@ export default function AdminModulePage() {
           <h1 className="font-display font-bold text-2xl mb-1">{mod.label}</h1>
           <p className="text-ink/60">{rows.length} record{rows.length === 1 ? '' : 's'} submitted so far.</p>
         </div>
-        <Button onClick={exportCSV}>Download CSV</Button>
+        <Button onClick={exportPDF}>Download PDF</Button>
       </div>
 
       {actionError && (
