@@ -90,6 +90,20 @@ export function AuthProvider({ children }) {
     return () => { if (channel) supabase.removeChannel(channel) }
   }, [session?.user?.id])
 
+  // Belt-and-braces fallback: the realtime subscription above depends on a
+  // websocket connection, which some mobile networks and office firewalls
+  // silently block without any error the app can detect -- the person just
+  // never gets the live update and has no idea why. This re-fetches the
+  // profile every 45 seconds regardless, so even on a network that blocks
+  // websockets entirely, a promotion still shows up within under a minute
+  // instead of requiring a manual refresh forever.
+  useEffect(() => {
+    const userId = session?.user?.id
+    if (!userId) return
+    const interval = setInterval(() => loadProfile(userId), 45_000)
+    return () => clearInterval(interval)
+  }, [session?.user?.id])
+
   async function signOut() {
     try {
       await supabase.auth.signOut()

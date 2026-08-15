@@ -10,6 +10,11 @@ import { friendlyError } from '../../lib/friendlyError'
 
 const PAYMENT_PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
 const PAYMENT_METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', 'Cash to District Office', 'Other']
+// See the matching constant/comment in MemberPayments.jsx -- these three
+// always cost exactly the member's locked category fee, so the district
+// admin reporting it on their behalf shouldn't be able to type a
+// different (i.e. partial) amount either.
+const FIXED_FEE_PURPOSES = ['Registration Fee', 'Annual Subscription', 'Life Membership Fee']
 
 export default function AdminMembers() {
   const { isAdmin, isDistrictAdmin, managedDistrict, isStaff, user: currentUser } = useAuth()
@@ -437,12 +442,35 @@ export default function AdminMembers() {
           </p>
           <form onSubmit={submitPayment}>
             <Field label="Purpose">
-              <Select value={paymentForm.purpose} onChange={e => setPaymentForm(f => ({ ...f, purpose: e.target.value }))}>
+              <Select
+                value={paymentForm.purpose}
+                onChange={e => {
+                  const purpose = e.target.value
+                  setPaymentForm(f => ({
+                    ...f,
+                    purpose,
+                    amount: FIXED_FEE_PURPOSES.includes(purpose) ? (paymentTarget.amount ?? '') : '',
+                  }))
+                }}
+              >
                 {PAYMENT_PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
               </Select>
             </Field>
-            <Field label="Amount Paid (UGX)">
-              <Input type="number" min="0" value={paymentForm.amount} onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))} required />
+            <Field
+              label="Amount Paid (UGX)"
+              hint={FIXED_FEE_PURPOSES.includes(paymentForm.purpose)
+                ? 'Locked to their registered category fee — must match exactly, no partial payments.'
+                : 'Enter the exact amount they paid.'}
+            >
+              <Input
+                type="number"
+                min="0"
+                value={paymentForm.amount}
+                onChange={e => setPaymentForm(f => ({ ...f, amount: e.target.value }))}
+                required
+                readOnly={FIXED_FEE_PURPOSES.includes(paymentForm.purpose)}
+                className={FIXED_FEE_PURPOSES.includes(paymentForm.purpose) ? 'bg-canvas-2 cursor-not-allowed' : ''}
+              />
             </Field>
             <Field label="Payment Method">
               <Select value={paymentForm.payment_method} onChange={e => setPaymentForm(f => ({ ...f, payment_method: e.target.value }))}>

@@ -12,6 +12,14 @@ import { friendlyError } from '../../lib/friendlyError'
 const PURPOSES = ['Registration Fee', 'Annual Subscription', 'Camp Fee', 'Life Membership Fee', 'Donation']
 const METHODS = ['Bank Deposit (Stanbic)', 'MTN Mobile Money', 'Airtel Money', 'Cash to District Office', 'Other']
 
+// These three always cost exactly the member's locked category fee — no
+// legitimate reason the reported amount should ever differ from it, and
+// letting it be typed freely is exactly how a partial payment slips
+// through as if it were the full fee. Camp Fee and Donation have no fixed
+// schedule anywhere in the system (camp fees vary by event, donations are
+// inherently whatever the donor gives), so those stay free-entry.
+const FIXED_FEE_PURPOSES = ['Registration Fee', 'Annual Subscription', 'Life Membership Fee']
+
 export default function MemberPayments() {
   const { member, loading: memberLoading, error: memberError, reload: reloadMember } = useMember()
   const location = useLocation()
@@ -23,9 +31,10 @@ export default function MemberPayments() {
   // Auto-open the form (and pre-fill it) when arriving straight from
   // registration, so the process visibly continues instead of stopping.
   const [showForm, setShowForm] = useState(Boolean(prefill.justRegistered))
+  const initialPurpose = prefill.prefillPurpose || PURPOSES[0]
   const [form, setForm] = useState({
-    amount: prefill.prefillAmount ?? '',
-    purpose: prefill.prefillPurpose || PURPOSES[0],
+    amount: FIXED_FEE_PURPOSES.includes(initialPurpose) ? (member?.amount ?? prefill.prefillAmount ?? '') : (prefill.prefillAmount ?? ''),
+    purpose: initialPurpose,
     payment_method: METHODS[0],
     reference_number: '',
     payment_date: '',
@@ -56,7 +65,15 @@ export default function MemberPayments() {
 
   useEffect(() => { loadPayments() }, [member])
 
-  function update(key, value) { setForm(f => ({ ...f, [key]: value })) }
+  function update(key, value) {
+    setForm(f => {
+      const next = { ...f, [key]: value }
+      if (key === 'purpose') {
+        next.amount = FIXED_FEE_PURPOSES.includes(value) ? (member?.amount ?? '') : ''
+      }
+      return next
+    })
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -142,8 +159,21 @@ export default function MemberPayments() {
                 {PURPOSES.map(p => <option key={p} value={p}>{p}</option>)}
               </Select>
             </Field>
-            <Field label="Amount Paid (UGX)">
-              <Input type="number" min="0" value={form.amount} onChange={e => update('amount', e.target.value)} required />
+            <Field
+              label="Amount Paid (UGX)"
+              hint={FIXED_FEE_PURPOSES.includes(form.purpose)
+                ? 'Locked to your registered category fee — this must match exactly, no partial payments.'
+                : 'Enter the exact amount you paid.'}
+            >
+              <Input
+                type="number"
+                min="0"
+                value={form.amount}
+                onChange={e => update('amount', e.target.value)}
+                required
+                readOnly={FIXED_FEE_PURPOSES.includes(form.purpose)}
+                className={FIXED_FEE_PURPOSES.includes(form.purpose) ? 'bg-canvas-2 cursor-not-allowed' : ''}
+              />
             </Field>
             <Field label="Payment Method">
               <Select value={form.payment_method} onChange={e => update('payment_method', e.target.value)}>

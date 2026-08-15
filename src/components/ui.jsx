@@ -34,10 +34,10 @@ export function Field({ label, children, hint }) {
   )
 }
 
-export function Input(props) {
+export function Input({ className = '', ...props }) {
   return (
     <input
-      className="w-full rounded-lg border border-khaki-dark/60 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-forest/40 focus:border-forest"
+      className={`w-full rounded-lg border border-khaki-dark/60 bg-white px-3.5 py-2.5 text-sm text-ink placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-forest/40 focus:border-forest ${className}`}
       {...props}
     />
   )
