@@ -123,7 +123,6 @@ export default function MemberLogin() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? 'Signing in…' : 'Login'}
               </Button>
-              <p className="text-sm text-ink/60 text-center font-medium mt-3">By SayMyTech Developers</p>
             </form>
             <p className="text-xs text-ink/50 text-center mt-4">
               Forgotten your password? Ask your Association admin to set a new one for you.
@@ -164,7 +163,6 @@ export default function MemberLogin() {
               <Button type="submit" className="w-full" disabled={busy}>
                 {busy ? 'Creating account…' : 'Create Account'}
               </Button>
-              <p className="text-sm text-ink/60 text-center font-medium mt-3">By SayMyTech Developers</p>
             </form>
             <button
               type="button"

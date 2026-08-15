@@ -73,7 +73,6 @@ export default function AdminLogin() {
           <Button type="submit" className="w-full" disabled={busy}>
             {busy ? 'Signing in…' : 'Sign In'}
           </Button>
-          <p className="text-sm text-ink/60 text-center font-medium mt-3">By SayMyTech Developers</p>
         </form>
         <p className="text-xs text-ink/50 text-center mt-4">
           Forgotten your password? Another admin can set a new one for you from the Members page.

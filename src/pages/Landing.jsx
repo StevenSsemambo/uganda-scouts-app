@@ -40,6 +40,7 @@ export default function Landing() {
           </Button>
         </Link>
       </div>
+      <p className="text-sm text-ink/60 font-medium mt-8">By SayMyTech Developers</p>
     </div>
   )
 }
