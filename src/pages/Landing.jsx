@@ -1,10 +1,13 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
+import { useInstallPrompt } from '../context/InstallPromptContext'
 
 export default function Landing() {
   const { user, profile, loading } = useAuth()
+  const { canInstall, installed, isIOS, install } = useInstallPrompt()
+  const [showIOSHint, setShowIOSHint] = useState(false)
   const navigate = useNavigate()
 
   // If someone lands here already signed in, send them straight to
@@ -40,6 +43,23 @@ export default function Landing() {
           </Button>
         </Link>
       </div>
+
+      {!installed && (canInstall || isIOS) && (
+        <div className="mt-6">
+          <button
+            onClick={() => (canInstall ? install() : setShowIOSHint(s => !s))}
+            className="text-sm text-forest font-medium hover:underline inline-flex items-center gap-1.5"
+          >
+            <span aria-hidden="true">⬇</span> Install App on This Device
+          </button>
+          {showIOSHint && (
+            <p className="text-xs text-ink/50 mt-2 max-w-xs mx-auto">
+              Tap the Share icon in your browser, then "Add to Home Screen".
+            </p>
+          )}
+        </div>
+      )}
+
       <p className="text-sm text-ink/60 font-medium mt-8">By SayMyTech Developers</p>
     </div>
   )

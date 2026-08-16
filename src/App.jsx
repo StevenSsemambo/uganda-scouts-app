@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { InstallPromptProvider } from './context/InstallPromptContext'
 import { RequireMember, RequireStaff, RequireAdmin } from './components/ProtectedRoute'
 import SplashScreen from './components/SplashScreen'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -86,7 +87,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <AppShell />
+        <InstallPromptProvider>
+          <AppShell />
+        </InstallPromptProvider>
       </AuthProvider>
     </ErrorBoundary>
   )
