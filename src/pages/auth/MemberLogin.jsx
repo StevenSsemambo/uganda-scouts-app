@@ -183,6 +183,8 @@ export default function MemberLogin() {
                   required
                   placeholder="e.g. nakatosarah"
                   autoCapitalize="none"
+                  autoComplete="username"
+                  name="username"
                 />
               </Field>
               <Field label="Password">
@@ -193,6 +195,8 @@ export default function MemberLogin() {
                     onChange={e => setLoginPassword(e.target.value)}
                     required
                     className="flex-1"
+                    autoComplete="current-password"
+                    name="password"
                   />
                   <button
                     type="button"
@@ -226,7 +230,7 @@ export default function MemberLogin() {
             </p>
             <form onSubmit={handleSignup}>
               <Field label="Full Name">
-                <Input value={name} onChange={e => handleNameChange(e.target.value)} required placeholder="e.g. Nakato Sarah" />
+                <Input value={name} onChange={e => handleNameChange(e.target.value)} required placeholder="e.g. Nakato Sarah" autoComplete="name" />
               </Field>
               <Field label="Category" hint="Your fee is set automatically from this.">
                 <Select value={category} onChange={e => setCategory(e.target.value)}>
@@ -257,6 +261,8 @@ export default function MemberLogin() {
                   required
                   placeholder="e.g. nakatosarah"
                   autoCapitalize="none"
+                  autoComplete="username"
+                  name="username"
                 />
               </Field>
               <Field label="Password" hint="At least 6 characters.">
@@ -268,6 +274,8 @@ export default function MemberLogin() {
                     required
                     minLength={6}
                     className="flex-1"
+                    autoComplete="new-password"
+                    name="new-password"
                   />
                   <button
                     type="button"

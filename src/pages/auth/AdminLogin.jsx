@@ -9,6 +9,7 @@ export default function AdminLogin() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -64,10 +65,29 @@ export default function AdminLogin() {
               required
               placeholder="admin"
               autoCapitalize="none"
+              autoComplete="username"
+              name="username"
             />
           </Field>
           <Field label="Password">
-            <Input type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+            <div className="flex gap-2">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                className="flex-1"
+                autoComplete="current-password"
+                name="password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(s => !s)}
+                className="text-xs text-ink/50 shrink-0 px-2"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </button>
+            </div>
           </Field>
           {error && <p className="text-clay text-sm mb-3">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
