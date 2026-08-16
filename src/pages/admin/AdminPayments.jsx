@@ -16,9 +16,29 @@ function schoolLevel(category) {
   return null
 }
 
+function verifierLabel(verifier, currentUserId, verifiedById) {
+  if (!verifiedById) return null
+  if (verifiedById === currentUserId) return 'You'
+  if (!verifier) return 'another admin' // profile since deleted/reassigned
+  return verifier.role === 'district_admin'
+    ? `${verifier.name} (District Admin, ${verifier.managed_district})`
+    : `${verifier.name} (Main Admin)`
+}
+
+// A PDF may be read by anyone, any time after export — "You" only makes
+// sense live, on screen, to the person currently looking at it.
+function verifierLabelForExport(verifier, verifiedById) {
+  if (!verifiedById) return ''
+  if (!verifier) return 'Unknown admin'
+  return verifier.role === 'district_admin'
+    ? `${verifier.name} (District Admin, ${verifier.managed_district})`
+    : `${verifier.name} (Main Admin)`
+}
+
 export default function AdminPayments() {
   const { user, isAdmin } = useAuth()
   const [payments, setPayments] = useState([])
+  const [verifiersById, setVerifiersById] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [filter, setFilter] = useState('pending')
@@ -38,6 +58,22 @@ export default function AdminPayments() {
       const { data, error } = await query
       if (error) throw error
       setPayments(data || [])
+
+      // payments.verified_by has no direct FK to profiles (it points at
+      // auth.users), so PostgREST can't auto-embed it — fetch the small
+      // set of verifier profiles separately and merge client-side, same
+      // pattern already used for member profiles on the Members page.
+      const verifierIds = [...new Set((data || []).map(p => p.verified_by).filter(Boolean))]
+      if (verifierIds.length > 0) {
+        const { data: verifiers, error: verifiersError } = await supabase
+          .from('profiles')
+          .select('id, name, role, managed_district')
+          .in('id', verifierIds)
+        if (verifiersError) throw verifiersError
+        setVerifiersById(Object.fromEntries((verifiers || []).map(v => [v.id, v])))
+      } else {
+        setVerifiersById({})
+      }
     } catch (err) {
       console.error('Failed to load payments:', err)
       setLoadError(friendlyError(err, 'Could not load payments.'))
@@ -125,6 +161,7 @@ export default function AdminPayments() {
         reference: p.reference_number,
         payment_date: p.payment_date,
         status: p.status,
+        verified_by: verifierLabelForExport(verifiersById[p.verified_by], p.verified_by),
         year: p.year,
       })),
     })
@@ -190,6 +227,12 @@ export default function AdminPayments() {
                 <div className="text-xs text-ink/45 mt-1">
                   Ref: {p.reference_number} · {formatDate(p.payment_date)} · {p.payment_method}
                 </div>
+                {p.status !== 'pending' && p.verified_by && (
+                  <div className="text-xs text-ink/45 mt-1">
+                    {p.status === 'verified' ? 'Verified' : 'Rejected'} by {verifierLabel(verifiersById[p.verified_by], user?.id, p.verified_by)}
+                    {p.verified_at && ` · ${formatDate(p.verified_at)}`}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <StatusPill status={p.status} />
