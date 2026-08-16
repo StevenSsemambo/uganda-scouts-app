@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { RequireMember, RequireStaff, RequireAdmin } from './components/ProtectedRoute'
 import SplashScreen from './components/SplashScreen'
 import ErrorBoundary from './components/ErrorBoundary'
+import InstallPrompt from './components/InstallPrompt'
 
 import Landing from './pages/Landing'
 import MemberLogin from './pages/auth/MemberLogin'
@@ -49,6 +50,7 @@ function AppShell() {
 
   return (
     <BrowserRouter>
+      <InstallPrompt />
       <Routes>
         <Route path="/" element={page(<Landing />)} />
 
