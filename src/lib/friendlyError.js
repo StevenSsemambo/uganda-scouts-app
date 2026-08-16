@@ -5,6 +5,19 @@ export function friendlyAuthError(error) {
   if (!error) return ''
   const msg = (error.message || '').toLowerCase()
 
+  // Not a bug in the app or the server -- this happens when the device's
+  // own date/time is set incorrectly (usually "automatic time zone" or
+  // "set time automatically" turned off, or the clock drifted). Every
+  // login token carries an "issued at" timestamp, and if the device's
+  // clock disagrees enough with real time, the token can look like it
+  // was issued in the future (or already expired) the moment it arrives.
+  // No code change can fix a wrong clock -- the fix has to happen on the
+  // device -- so this points directly at that instead of showing a
+  // cryptic "jwt issued at future" message.
+  if (msg.includes('issued at') || msg.includes('jwt issued') || msg.includes('clock')) {
+    return "This device's date and time appear to be set incorrectly, which stops sign-in from working. Go to your device's Settings and turn on \"Set time automatically\" (or fix the date/time and time zone manually), then try signing in again."
+  }
+
   if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('duplicate')) {
     return 'That username is already taken. Please choose a different one.'
   }
@@ -37,6 +50,9 @@ export function friendlyError(error, fallback = 'Something went wrong. Please tr
   }
   if (msg.includes('duplicate key') || msg.includes('already exists')) {
     return 'That already exists — no changes were made.'
+  }
+  if (msg.includes('issued at') || msg.includes('jwt issued') || msg.includes('clock')) {
+    return "This device's date and time appear to be set incorrectly. Turn on \"Set time automatically\" in your device's Settings, then try again."
   }
   if (msg.includes('jwt') || msg.includes('expired') || msg.includes('invalid token')) {
     return 'Your session has expired — please sign in again.'
