@@ -8,7 +8,7 @@ export default function SplashScreen() {
         <img
           src="/logo.png"
           alt="Uganda Scouts Association"
-          className="w-32 h-32 md:w-40 md:h-40 drop-shadow-lg animate-pulse"
+          className="w-32 h-32 md:w-40 md:h-40 object-contain drop-shadow-lg animate-pulse"
         />
         <h1 className="font-display font-bold text-2xl md:text-3xl text-canvas mt-6 leading-tight">
           The Uganda Scouts Association

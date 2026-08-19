@@ -32,7 +32,7 @@ export default class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 text-center">
-          <img src="/logo.png" alt="" className="w-20 h-20 mb-6 opacity-90" />
+          <img src="/logo.png" alt="" className="w-20 h-20 object-contain mb-6 opacity-90" />
           <h1 className="font-display font-bold text-xl text-ink mb-2">
             Something went wrong
           </h1>

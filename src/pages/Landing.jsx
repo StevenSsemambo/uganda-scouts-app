@@ -24,10 +24,15 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 text-center">
       <img
-        src="/wordmark-logo.png"
+        src="/logo.png"
         alt="The Uganda Scouts Association"
-        className="w-48 md:w-56 mb-8 drop-shadow-sm"
+        className="w-28 md:w-32 object-contain drop-shadow-sm mb-4"
       />
+      <div className="mb-8">
+        <p className="text-xs tracking-[0.3em] text-ink/50 uppercase">The</p>
+        <h1 className="font-display font-bold text-4xl md:text-5xl text-forest leading-tight">Uganda</h1>
+        <p className="font-display font-semibold text-lg text-ember">Scouts Association</p>
+      </div>
       <p className="text-ink/60 max-w-md mb-10">
         Membership registration, subscriptions, and fee tracking for districts across Uganda.
       </p>
